@@ -5,15 +5,24 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 
 export default function TaskBoard({ roomId }) {
+  const [isConnected, setIsConnected] = useState(false);
   const [tasks, setTasks] = useState({});
   const [newTask, setNewTask] = useState('');
   const [ymap, setYmap] = useState(null);
 
   useEffect(() => {
     const doc = new Y.Doc();
-    const wsProvider = new WebsocketProvider('ws://localhost:3001/yjs', `taskboard-${roomId}`, doc);
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    const wsBase = socketUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+    const wsUrl = `${wsBase}/yjs`;
+
+    const wsProvider = new WebsocketProvider(wsUrl, `taskboard-${roomId}`, doc);
     const map = doc.getMap('tasks');
     setYmap(map);
+
+    wsProvider.on('status', event => {
+      setIsConnected(event.status === 'connected');
+    });
 
     const updateTasks = () => {
       setTasks(map.toJSON());
@@ -60,7 +69,18 @@ export default function TaskBoard({ roomId }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '1rem', background: 'var(--panel-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 500 }}>Collaborative Task Board</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 500 }}>Collaborative Task Board</h3>
+          {isConnected ? (
+            <span style={{ fontSize: '0.75rem', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span> Connected
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.75rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }}></span> Offline
+            </span>
+          )}
+        </div>
         <form onSubmit={addTask} style={{ display: 'flex', gap: '0.5rem' }}>
           <input
             type="text"

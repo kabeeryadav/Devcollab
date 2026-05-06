@@ -32,13 +32,18 @@ const wss = new WebSocket.Server({ noServer: true });
 wss.on('connection', setupWSConnection);
 
 server.on('upgrade', (request, socket, head) => {
-  // If request URL starts with /yjs, handle it with y-websocket
-  if (request.url.startsWith('/yjs')) {
+  const { pathname } = new URL(request.url, `http://${request.headers.host}`);
+  console.log(`Upgrade request for: ${pathname}`);
+
+  if (pathname.startsWith('/yjs')) {
     wss.handleUpgrade(request, socket, head, (ws) => {
+      console.log(`Yjs websocket connection established for: ${pathname}`);
       wss.emit('connection', ws, request);
     });
+  } else {
+    // Socket.io handles its own upgrades if the path is /socket.io/
+    // We don't need to do anything here for Socket.io
   }
-  // Otherwise, let Socket.io handle its own upgrade requests internally
 });
 
 const activeUsers = new Map();

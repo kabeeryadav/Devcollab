@@ -217,7 +217,7 @@ export default function VideoCall({ socket, roomId, username }) {
 
       {/* Floating Video Grid for Video Calls */}
       {inCall && callType === 'video' && (
-        <div style={{ 
+        <div className="video-grid-floating" style={{ 
           position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 900,
           background: 'rgba(20, 20, 20, 0.7)', backdropFilter: 'blur(10px)',
           padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)',

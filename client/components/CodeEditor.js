@@ -90,6 +90,7 @@ export default function CodeEditor({ roomId, username }) {
   
   const [terminalHeight, setTerminalHeight] = useState(250);
   const [isDraggingTerminal, setIsDraggingTerminal] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -107,7 +108,11 @@ export default function CodeEditor({ roomId, username }) {
 
     const doc = new Y.Doc();
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-    const wsUrl = socketUrl.replace('http', 'ws') + '/yjs';
+    // Robustly construct wsUrl: replace http/https with ws/wss and remove trailing slash
+    const wsBase = socketUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+    const wsUrl = `${wsBase}/yjs`;
+    
+    console.log('Connecting to Yjs at:', wsUrl, 'Room:', roomId);
     const wsProvider = new WebsocketProvider(wsUrl, roomId, doc);
     
     const settingsMap = doc.getMap('settings');
@@ -122,6 +127,11 @@ export default function CodeEditor({ roomId, username }) {
     const type = doc.getText('monaco');
     typeRef.current = type;
     const monacoBinding = new MonacoBinding(type, editor.getModel(), new Set([editor]), wsProvider.awareness);
+
+    // Track connection status
+    wsProvider.on('status', event => {
+      setIsConnected(event.status === 'connected');
+    });
 
     settingsMap.observe((event) => {
       if (settingsMap.has('language')) {
@@ -400,7 +410,7 @@ export default function CodeEditor({ roomId, username }) {
 
   return (
     <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '0.4rem 1rem', background: 'var(--panel-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="editor-toolbar" style={{ padding: '0.4rem 1rem', background: 'var(--panel-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
         
         {/* Left Actions Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -451,7 +461,15 @@ export default function CodeEditor({ roomId, username }) {
               <option key={lang.id} value={lang.id}>{lang.name}</option>
             ))}
           </select>
-          <span style={{ fontSize: '0.75rem', color: 'var(--success)', whiteSpace: 'nowrap' }}>● Connected</span>
+            {isConnected ? (
+              <span style={{ fontSize: '0.75rem', color: '#22c55e', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span> Connected
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.75rem', color: '#ef4444', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }}></span> Reconnecting...
+              </span>
+            )}
         </div>
       </div>
       <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -475,7 +493,7 @@ export default function CodeEditor({ roomId, username }) {
           onMouseDown={startTerminalDrag}
         />
 
-        <div style={{ height: `${terminalHeight}px`, flexShrink: 0, borderTop: '1px solid var(--border-color)', background: 'var(--panel-bg)', padding: '0.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="terminal-container" style={{ height: `${terminalHeight}px`, flexShrink: 0, borderTop: '1px solid var(--border-color)', background: 'var(--panel-bg)', padding: '0.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
            <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
              {['html', 'css'].includes(language) ? 'Live Web Preview' : 'Output Terminal'}
            </h4>

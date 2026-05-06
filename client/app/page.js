@@ -348,7 +348,17 @@ export default function HomeDashboard() {
         body { background: #fafafa; }
         input::placeholder { color: #94a3b8; }
         @media (max-width: 768px) {
-          div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+          div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; gap: 2.5rem !important; }
+        }
+        @media (max-width: 480px) {
+          nav { padding: 0.75rem 1.25rem !important; }
+          div[style*="padding: 4rem 2.5rem"] { padding: 2rem 1.25rem !important; }
+          h1 { font-size: 2.2rem !important; }
+        }
+        @media (max-width: 320px) {
+          h1 { font-size: 1.8rem !important; }
+          p { fontSize: 0.9rem !important; }
+          .btn { padding: 0.6rem 1rem !important; }
         }
       `}</style>
     </div>

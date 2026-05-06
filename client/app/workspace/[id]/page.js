@@ -30,6 +30,7 @@ export default function WorkspacePage({ params }) {
   const [recentlyJoined, setRecentlyJoined] = useState(new Set()); // socket IDs that just joined
   const mySocketId = useRef(null);
   
+  const [isMobile, setIsMobile] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
@@ -152,6 +153,17 @@ export default function WorkspacePage({ params }) {
     };
   }, [isDraggingSidebar]);
 
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth <= 1024;
+      setIsMobile(mobile);
+      if (mobile) setIsSidebarCollapsed(true);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const startSidebarDrag = (e) => {
     e.preventDefault();
     setIsDraggingSidebar(true);
@@ -245,8 +257,24 @@ export default function WorkspacePage({ params }) {
         </div>
       )}
 
+      {/* Mobile Sidebar Overlay */}
+      {!isSidebarCollapsed && isMobile && (
+        <div 
+          onClick={() => setIsSidebarCollapsed(true)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, backdropFilter: 'blur(4px)' }}
+        />
+      )}
+
       {/* Sidebar - Chat & Users */}
-      <div className="sidebar" style={{ width: isSidebarCollapsed ? '0px' : `${sidebarWidth}px`, display: isSidebarCollapsed ? 'none' : 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div 
+        className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`} 
+        style={{ 
+          width: isSidebarCollapsed ? (isMobile ? '320px' : '0px') : `${sidebarWidth}px`, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          flexShrink: 0 
+        }}
+      >
         <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 
             onClick={() => setIsSidebarCollapsed(true)}

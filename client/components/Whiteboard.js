@@ -9,6 +9,7 @@ const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#ffffff'
 
 export default function Whiteboard({ roomId }) {
   const canvasRef = useRef(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [provider, setProvider] = useState(null);
   const [ydoc, setYdoc] = useState(null);
   
@@ -33,9 +34,17 @@ export default function Whiteboard({ roomId }) {
 
   useEffect(() => {
     const doc = new Y.Doc();
-    const wsProvider = new WebsocketProvider('ws://localhost:3001/yjs', `whiteboard-${roomId}`, doc);
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    const wsBase = socketUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+    const wsUrl = `${wsBase}/yjs`;
+
+    const wsProvider = new WebsocketProvider(wsUrl, `whiteboard-${roomId}`, doc);
     const ymap = doc.getMap('lines');
     ymapRef.current = ymap;
+
+    wsProvider.on('status', event => {
+      setIsConnected(event.status === 'connected');
+    });
 
     setYdoc(doc);
     setProvider(wsProvider);
@@ -214,7 +223,18 @@ export default function Whiteboard({ roomId }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ padding: '0.5rem 1rem', background: 'var(--panel-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3 style={{ fontSize: '0.875rem', fontWeight: 500, marginRight: '1rem' }}>Whiteboard</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h3 style={{ fontSize: '0.875rem', fontWeight: 500 }}>Whiteboard</h3>
+          {isConnected ? (
+            <span style={{ fontSize: '0.7rem', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }}></span> Live
+            </span>
+          ) : (
+            <span style={{ fontSize: '0.7rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }}></span> Offline
+            </span>
+          )}
+        </div>
         
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
