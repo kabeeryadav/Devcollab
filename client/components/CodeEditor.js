@@ -119,10 +119,20 @@ export default function CodeEditor({ roomId, username }) {
     settingsMapRef.current = settingsMap;
 
     // Awareness (Cursors)
+    const userColor = '#' + Math.floor(Math.random()*16777215).toString(16);
     wsProvider.awareness.setLocalStateField('user', {
       name: username,
-      color: '#' + Math.floor(Math.random()*16777215).toString(16)
+      color: userColor
     });
+
+    // Style awareness cursors
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .yRemoteSelection-${wsProvider.awareness.clientID} { background-color: ${userColor}33; }
+      .yRemoteSelectionHead-${wsProvider.awareness.clientID} { border-color: ${userColor}; }
+      .yRemoteSelectionHead-${wsProvider.awareness.clientID}::after { background-color: ${userColor}; }
+    `;
+    document.head.appendChild(style);
 
     const type = doc.getText('monaco');
     typeRef.current = type;
@@ -168,7 +178,10 @@ export default function CodeEditor({ roomId, username }) {
         setLanguage(sharedLang);
         if (monacoRef.current && editorRef.current) {
           const monacoLang = sharedLang === 'jupyter' ? 'python' : sharedLang;
-          monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), monacoLang);
+          const model = editorRef.current.getModel();
+          if (model) {
+            monacoRef.current.editor.setModelLanguage(model, monacoLang);
+          }
         }
       }
     });
@@ -445,6 +458,10 @@ export default function CodeEditor({ roomId, username }) {
           
           <button className="btn" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: '#8b5cf6', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={handleDownload}>
             <Download size={14} /> Download
+          </button>
+
+          <button className="btn" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={() => { if(confirm('Reset code to boilerplate?')) handleLanguageChange(language); }}>
+             Reset
           </button>
         </div>
 

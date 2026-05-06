@@ -49,6 +49,13 @@ export default function Whiteboard({ roomId }) {
     setYdoc(doc);
     setProvider(wsProvider);
 
+    wsProvider.on('sync', (isSynced) => {
+      if (isSynced) {
+        console.log('Whiteboard Synced');
+        redrawAll();
+      }
+    });
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
@@ -165,7 +172,9 @@ export default function Whiteboard({ roomId }) {
     canvas.addEventListener('mousemove', onMouseMove);
 
     // Initial draw
-    redrawAll();
+    if (wsProvider.synced) {
+      redrawAll();
+    }
 
     return () => {
       canvas.removeEventListener('mousedown', onMouseDown);

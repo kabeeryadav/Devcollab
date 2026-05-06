@@ -11,7 +11,7 @@ const TaskBoard = dynamic(() => import('@/components/TaskBoard'), { ssr: false }
 const Chat = dynamic(() => import('@/components/Chat'), { ssr: false });
 const Whiteboard = dynamic(() => import('@/components/Whiteboard'), { ssr: false });
 const VideoCall = dynamic(() => import('@/components/VideoCall'), { ssr: false });
-import { Code, LayoutDashboard, CheckSquare, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Code, LayoutDashboard, CheckSquare, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck } from 'lucide-react';
 
 export default function WorkspacePage({ params }) {
   const roomId = params.id;
@@ -28,7 +28,9 @@ export default function WorkspacePage({ params }) {
   const [joinRequests, setJoinRequests] = useState([]);
   const [shareToasts, setShareToasts] = useState([]); // [{id, sharer, type:'share'|'join'}]
   const [recentlyJoined, setRecentlyJoined] = useState(new Set()); // socket IDs that just joined
+  const [remoteCursors, setRemoteCursors] = useState({}); // { socketId: { x, y, username, color } }
   const mySocketId = useRef(null);
+  const myColor = useRef('#' + Math.floor(Math.random()*16777215).toString(16));
   
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -78,6 +80,15 @@ export default function WorkspacePage({ params }) {
     });
 
     newSocket.on('room-users', (updatedUsers) => {
+      const userIds = new Set(updatedUsers.map(u => u.id));
+      setRemoteCursors(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(id => {
+          if (!userIds.has(id)) delete next[id];
+        });
+        return next;
+      });
+
       setUsers(prev => {
         const prevIds = new Set(prev.map(u => u.id));
         updatedUsers.forEach(u => {
@@ -107,7 +118,41 @@ export default function WorkspacePage({ params }) {
       router.push('/');
     });
 
-    return () => newSocket.disconnect();
+    newSocket.on('cursor-move', (data) => {
+      setRemoteCursors(prev => ({
+        ...prev,
+        [data.userId]: { x: data.x, y: data.y, username: data.username, color: data.color }
+      }));
+    });
+
+    const handleMouseMove = (e) => {
+      if (newSocket && newSocket.connected) {
+        newSocket.emit('cursor-move', {
+          roomId,
+          username,
+          x: e.clientX / window.innerWidth,
+          y: e.clientY / window.innerHeight,
+          color: myColor.current
+        });
+      }
+    };
+
+    // Throttle cursor movement
+    let lastMove = 0;
+    const throttledMouseMove = (e) => {
+      const now = Date.now();
+      if (now - lastMove > 40) { // ~25fps for cursors
+        handleMouseMove(e);
+        lastMove = now;
+      }
+    };
+
+    window.addEventListener('mousemove', throttledMouseMove);
+
+    return () => {
+      newSocket.disconnect();
+      window.removeEventListener('mousemove', throttledMouseMove);
+    };
   }, [roomId, username]);
 
   const [isDark, setIsDark] = useState(false);
@@ -301,7 +346,9 @@ export default function WorkspacePage({ params }) {
                     {u.username} {u.id === (socket && socket.id) ? '(you)' : ''}
                   </span>
                   {u.isHost && (
-                    <span style={{ fontSize: '0.6rem', background: '#f59e0b', color: '#000', borderRadius: '4px', padding: '1px 5px', fontWeight: 700, flexShrink: 0 }}>HOST</span>
+                    <span style={{ fontSize: '0.65rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderRadius: '6px', padding: '1px 6px', fontWeight: 700, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.25rem', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                      <ShieldCheck size={10} /> HOST
+                    </span>
                   )}
                 </div>
                 {/* Host controls — only shown to host, for non-host, non-recently-joined members */}
@@ -309,14 +356,20 @@ export default function WorkspacePage({ params }) {
                   <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
                     <button
                       title="Make Host"
+                      className="btn-icon"
                       onClick={() => socket.emit('promote-host', { roomId, targetId: u.id })}
-                      style={{ fontSize: '0.65rem', padding: '2px 6px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >👑</button>
+                      style={{ padding: '4px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '6px' }}
+                    >
+                      <Crown size={14} />
+                    </button>
                     <button
                       title="Kick"
+                      className="btn-icon"
                       onClick={() => { if(confirm(`Kick ${u.username}?`)) socket.emit('kick-user', { roomId, targetId: u.id }); }}
-                      style={{ fontSize: '0.65rem', padding: '2px 6px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >✕</button>
+                      style={{ padding: '4px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px' }}
+                    >
+                      <UserMinus size={14} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -404,6 +457,26 @@ export default function WorkspacePage({ params }) {
           </div>
         </div>
       </div>
+
+      {/* Figma-style Cursors */}
+      {Object.entries(remoteCursors).map(([id, cursor]) => (
+        <div 
+          key={id} 
+          className="cursor-remote"
+          style={{ 
+            left: `${cursor.x * 100}%`,
+            top: `${cursor.y * 100}%`,
+            display: recentlyJoined.has(id) ? 'none' : 'block' // hide for a moment if they just joined (optional)
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill={cursor.color}>
+            <path d="M5.653 3.123l12.87 12.87a1 1 0 01-.223 1.636l-4.52 2.215a1 1 0 01-1.127-.118l-1.92-1.74a1 1 0 00-.667-.257h-4.32a1 1 0 01-1-1V4.123a1 1 0 011.887-.453l.99 1.94z" />
+          </svg>
+          <div className="cursor-label" style={{ backgroundColor: cursor.color }}>
+            {cursor.username}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

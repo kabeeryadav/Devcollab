@@ -29,7 +29,7 @@ const io = new Server(server, {
 // Setup y-websocket server on the same HTTP server
 const wss = new WebSocket.Server({ noServer: true });
 
-wss.on('connection', setupWSConnection);
+// wss.on('connection', setupWSConnection); // Handled manually in upgrade below
 
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host}`);
@@ -38,7 +38,7 @@ server.on('upgrade', (request, socket, head) => {
   if (pathname.startsWith('/yjs')) {
     wss.handleUpgrade(request, socket, head, (ws) => {
       // Strip the /yjs prefix so that setupWSConnection sees a clean room name
-      request.url = request.url.replace(/^\/yjs/, '') || '/';
+      request.url = decodeURIComponent(request.url.replace(/^\/yjs/, '') || '/');
       console.log(`Yjs connection established for room: ${request.url}`);
       setupWSConnection(ws, request);
     });
@@ -163,6 +163,17 @@ io.on('connection', (socket) => {
     activeUsers.delete(targetId);
     
     io.to(roomId).emit('room-users', getUserList(roomId));
+  });
+
+  // Cursor Tracking
+  socket.on('cursor-move', (data) => {
+    socket.to(data.roomId).emit('cursor-move', {
+      userId: socket.id,
+      username: data.username,
+      x: data.x,
+      y: data.y,
+      color: data.color
+    });
   });
 
   // Chat

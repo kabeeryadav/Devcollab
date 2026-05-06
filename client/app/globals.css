@@ -468,3 +468,56 @@ nextjs-portal,
 [id*="nextjs"] {
   display: none !important;
 }
+
+/* Collaborative Cursors (Figma Style) */
+.cursor-remote {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  transition: transform 0.08s linear;
+}
+
+.cursor-remote svg {
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.cursor-label {
+  position: absolute;
+  top: 18px;
+  left: 10px;
+  padding: 2px 8px;
+  border-radius: 4px 10px 10px 10px;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Monaco Cursor Customizations */
+.yRemoteSelection {
+  background-color: rgba(60, 60, 255, 0.1);
+}
+
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid var(--cursor-color, orange);
+  height: 100%;
+}
+
+.yRemoteSelectionHead::after {
+  position: absolute;
+  content: attr(data-user);
+  background-color: var(--cursor-color, orange);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 0 4px;
+  top: -14px;
+  left: -2px;
+  border-radius: 2px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
