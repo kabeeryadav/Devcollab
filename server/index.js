@@ -50,6 +50,7 @@ server.on('upgrade', (request, socket, head) => {
 
 const activeUsers = new Map();
 const pendingRequests = new Map(); // socketId -> { username, roomId }
+const recentUsers = new Map(); // roomId-username -> timestamp
 
 const getUserList = (rId) => Array.from(activeUsers.entries())
   .filter(([id, user]) => user.roomId === rId)
@@ -67,11 +68,15 @@ io.on('connection', (socket) => {
   socket.on('join-room', ({ roomId, username }) => {
     // Check if room is empty to assign host
     const isFirst = Array.from(activeUsers.values()).filter(u => u.roomId === roomId).length === 0;
+    const userKey = `${roomId}-${username}`;
+    const wasRecent = recentUsers.has(userKey) && (Date.now() - recentUsers.get(userKey) < 60000); // 60 seconds grace
 
-    if (isFirst) {
-      // Creator joins immediately as host
+    if (isFirst || wasRecent) {
+      // Creator or rejoining user joins immediately
       socket.join(roomId);
-      activeUsers.set(socket.id, { username, roomId, isHost: true });
+      activeUsers.set(socket.id, { username, roomId, isHost: isFirst && !wasRecent ? true : (wasRecent ? recentUsers.get(userKey + '-isHost') : false) });
+      recentUsers.delete(userKey);
+      recentUsers.delete(userKey + '-isHost');
       io.to(roomId).emit('room-users', getUserList(roomId));
       socket.emit('join-approved');
     } else {
@@ -250,9 +255,20 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const user = activeUsers.get(socket.id);
     if (user) {
-      const { roomId, isHost } = user;
+      const { roomId, username, isHost } = user;
       activeUsers.delete(socket.id);
       
+      // Store in recent users for auto-rejoin
+      const userKey = `${roomId}-${username}`;
+      recentUsers.set(userKey, Date.now());
+      recentUsers.set(userKey + '-isHost', isHost);
+      setTimeout(() => {
+        if (recentUsers.get(userKey) < Date.now() - 55000) {
+          recentUsers.delete(userKey);
+          recentUsers.delete(userKey + '-isHost');
+        }
+      }, 60000);
+
       // If host left, promote the next user in the room
       if (isHost) {
         const remaining = Array.from(activeUsers.entries()).filter(([id, u]) => u.roomId === roomId);

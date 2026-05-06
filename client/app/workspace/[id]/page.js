@@ -137,21 +137,28 @@ export default function WorkspacePage({ params }) {
       }
     };
 
-    // Throttle cursor movement
-    let lastMove = 0;
     const throttledMouseMove = (e) => {
       const now = Date.now();
-      if (now - lastMove > 40) { // ~25fps for cursors
+      if (now - lastMove > 40) {
         handleMouseMove(e);
         lastMove = now;
       }
     };
+    let lastMove = 0;
 
     window.addEventListener('mousemove', throttledMouseMove);
+
+    // Refresh protection
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       newSocket.disconnect();
       window.removeEventListener('mousemove', throttledMouseMove);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [roomId, username]);
 
