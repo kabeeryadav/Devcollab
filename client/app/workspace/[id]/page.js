@@ -425,7 +425,7 @@ export default function WorkspacePage({ params }) {
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <VideoCall socket={socket} roomId={roomId} username={username} />
+            <VideoCall socket={socket} roomId={roomId} username={username} users={users} />
             <button 
               onClick={copyRoomId}
               style={{ background: 'transparent', border: '1px dashed var(--border-color)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.825rem', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', transition: 'all 0.2s' }}

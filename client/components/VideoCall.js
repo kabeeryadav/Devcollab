@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneCall, PhoneOff, PhoneIncoming, Check, X, Users, Headphones } from 'lucide-react';
 
-export default function VideoCall({ socket, roomId, username }) {
+export default function VideoCall({ socket, roomId, username, users }) {
   const [inCall, setInCall] = useState(false);
   const [callType, setCallType] = useState(null); // 'audio' | 'video'
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [streams, setStreams] = useState([]); // Array of { id, stream, isLocal }
+  const [streams, setStreams] = useState([]); // Array of { id, stream, isLocal, name }
   
   const localStreamRef = useRef(null);
   const peersRef = useRef({});
@@ -95,7 +95,7 @@ export default function VideoCall({ socket, roomId, username }) {
     pc.ontrack = (event) => {
       setStreams(prev => {
         if (prev.find(s => s.id === userId)) return prev;
-        return [...prev, { id: userId, stream: event.streams[0], isLocal: false }];
+        return [...prev, { id: userId, stream: event.streams[0], isLocal: false, name: '' }];
       });
       // Always play audio (if any) to ensure we hear them even if we don't render video grid
       const stream = event.streams[0];
@@ -128,7 +128,7 @@ export default function VideoCall({ socket, roomId, username }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
       localStreamRef.current = stream;
-      setStreams([{ id: socket?.id || 'local', stream, isLocal: true }]);
+      setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
       setCallType(type);
       setInCall(true);
       if (socket) {
@@ -146,7 +146,7 @@ export default function VideoCall({ socket, roomId, username }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
       localStreamRef.current = stream;
-      setStreams([{ id: socket?.id || 'local', stream, isLocal: true }]);
+      setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
       setCallType(type);
       setInCall(true);
       if (socket) {
@@ -228,10 +228,26 @@ export default function VideoCall({ socket, roomId, username }) {
               <Users size={16} /> Team Video ({streams.length})
             </h4>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: streams.length > 1 ? '1fr 1fr' : '1fr', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
-            {streams.map((streamObj) => (
-              <VideoRenderer key={streamObj.id} stream={streamObj.stream} isLocal={streamObj.isLocal} />
-            ))}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '0.75rem', 
+            maxHeight: '70vh', 
+            overflowY: 'auto',
+            paddingRight: '4px' 
+          }}>
+            {streams.map((streamObj) => {
+              const remoteUser = users.find(u => u.id === streamObj.id);
+              const displayName = streamObj.isLocal ? 'You' : (remoteUser?.username || 'Remote');
+              return (
+                <VideoRenderer 
+                  key={streamObj.id} 
+                  stream={streamObj.stream} 
+                  isLocal={streamObj.isLocal} 
+                  name={displayName} 
+                />
+              );
+            })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <button onClick={toggleMute} className="btn" style={{ background: isMuted ? 'var(--danger)' : '#333', color: '#fff', border: 'none', padding: '0.5rem', borderRadius: '50%' }}>
@@ -280,15 +296,48 @@ export default function VideoCall({ socket, roomId, username }) {
   );
 }
 
-function VideoRenderer({ stream, isLocal }) {
+function VideoRenderer({ stream, isLocal, name }) {
   const videoRef = useRef(null);
   useEffect(() => {
     if (videoRef.current && stream) videoRef.current.srcObject = stream;
   }, [stream]);
   return (
-    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', background: '#000', aspectRatio: '4/3' }}>
-      <video ref={videoRef} autoPlay playsInline muted={isLocal} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: isLocal ? 'scaleX(-1)' : 'none' }} />
-      {isLocal && <div style={{ position: 'absolute', bottom: '8px', left: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px' }}>You</div>}
+    <div style={{ 
+      position: 'relative', 
+      borderRadius: '12px', 
+      overflow: 'hidden', 
+      background: '#111', 
+      aspectRatio: '16/9',
+      width: '240px',
+      border: '2px solid rgba(255,255,255,0.1)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+    }}>
+      <video 
+        ref={videoRef} 
+        autoPlay 
+        playsInline 
+        muted={isLocal} 
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          objectFit: 'contain', 
+          transform: isLocal ? 'scaleX(-1)' : 'none' 
+        }} 
+      />
+      <div style={{ 
+        position: 'absolute', 
+        bottom: '8px', 
+        left: '8px', 
+        background: 'rgba(0,0,0,0.6)', 
+        color: '#fff', 
+        fontSize: '0.75rem', 
+        padding: '2px 8px', 
+        borderRadius: '6px',
+        fontWeight: 500,
+        backdropFilter: 'blur(4px)'
+      }}>
+        {name}
+      </div>
     </div>
   );
 }
