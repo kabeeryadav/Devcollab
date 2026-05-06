@@ -9,7 +9,7 @@ const { setupWSConnection } = require('y-websocket/bin/utils');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+// const sqlite3 = require('sqlite3').verbose(); // Temporarily disabled due to build errors
 
 const app = express();
 app.use(cors());
@@ -282,32 +282,7 @@ app.post('/api/execute', (req, res) => {
   }
 
   if (language === 'sql') {
-    const db = new sqlite3.Database(':memory:');
-    db.serialize(() => {
-      // Execute all statements, then try to fetch if the last statement is a SELECT
-      const statements = code.split(';').filter(s => s.trim().length > 0);
-      let errorOccurred = false;
-      let output = '';
-
-      db.exec(code, function(err) {
-        if (err) {
-          db.close();
-          return res.json({ output: err.message, error: true });
-        }
-        const lastStmt = statements[statements.length - 1];
-        if (lastStmt && lastStmt.trim().toUpperCase().startsWith('SELECT')) {
-          db.all(lastStmt, [], (err, rows) => {
-            db.close();
-            if (err) return res.json({ output: err.message, error: true });
-            return res.json({ output: JSON.stringify(rows, null, 2), error: false });
-          });
-        } else {
-          db.close();
-          return res.json({ output: 'Query executed successfully.', error: false });
-        }
-      });
-    });
-    return;
+    return res.json({ output: 'SQL execution is temporarily disabled on the live server. It will be back soon!', error: false });
   }
 
   const tempDir = os.tmpdir();
