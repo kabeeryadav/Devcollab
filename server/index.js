@@ -196,6 +196,15 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('change-username', ({ newUsername }) => {
+    const user = activeUsers.get(socket.id);
+    if (user) {
+      console.log(`User ${user.username} changed name to ${newUsername}`);
+      user.username = newUsername;
+      io.to(user.roomId).emit('room-users', getUserList(user.roomId));
+    }
+  });
+
   // WebRTC Signaling (Voice Call)
   socket.on('join-voice', (roomId) => {
     socket.to(roomId).emit('user-joined-voice', socket.id);

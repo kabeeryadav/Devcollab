@@ -11,12 +11,16 @@ const TaskBoard = dynamic(() => import('@/components/TaskBoard'), { ssr: false }
 const Chat = dynamic(() => import('@/components/Chat'), { ssr: false });
 const Whiteboard = dynamic(() => import('@/components/Whiteboard'), { ssr: false });
 const VideoCall = dynamic(() => import('@/components/VideoCall'), { ssr: false });
-import { Code, LayoutDashboard, CheckSquare, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck } from 'lucide-react';
+const Settings = dynamic(() => import('@/components/Settings'), { ssr: false });
+import { Code, LayoutDashboard, CheckSquare, Settings as SettingsIcon, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck } from 'lucide-react';
 
 export default function WorkspacePage({ params }) {
   const roomId = params.id;
   const searchParams = useSearchParams();
-  const username = searchParams.get('username') || 'Anonymous';
+  const [localUsername, setLocalUsername] = useState('');
+  useEffect(() => {
+    setLocalUsername(searchParams.get('username') || 'Anonymous');
+  }, [searchParams]);
   const router = useRouter();
 
   const [socket, setSocket] = useState(null);
@@ -43,7 +47,7 @@ export default function WorkspacePage({ params }) {
     setTimeout(() => setCopied(false), 2000);
     // Notify host that this member is sharing the link
     if (socket) {
-      socket.emit('share-link', { roomId, username });
+      socket.emit('share-link', { roomId, username: localUsername });
     }
   };
 
@@ -55,7 +59,7 @@ export default function WorkspacePage({ params }) {
 
     newSocket.on('connect', () => {
       mySocketId.current = newSocket.id;
-      newSocket.emit('join-room', { roomId, username });
+      newSocket.emit('join-room', { roomId, username: localUsername });
     });
 
     // Host joins immediately — no waiting
@@ -129,7 +133,7 @@ export default function WorkspacePage({ params }) {
       if (newSocket && newSocket.connected) {
         newSocket.emit('cursor-move', {
           roomId,
-          username,
+          username: localUsername,
           x: e.clientX / window.innerWidth,
           y: e.clientY / window.innerHeight,
           color: myColor.current
@@ -155,12 +159,35 @@ export default function WorkspacePage({ params }) {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
+    // Global Shortcuts
+    const handleKeyDown = (e) => {
+      // Toggle Sidebar (Ctrl+B)
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed(prev => !prev);
+      }
+      // Switch Tabs (Alt + 1, 2, 3, 4)
+      if (e.altKey) {
+        if (e.key === '1') { e.preventDefault(); setActiveTab('editor'); }
+        if (e.key === '2') { e.preventDefault(); setActiveTab('whiteboard'); }
+        if (e.key === '3') { e.preventDefault(); setActiveTab('taskboard'); }
+        if (e.key === '4') { e.preventDefault(); setActiveTab('settings'); }
+      }
+      // Copy Room ID (Alt + C)
+      if (e.altKey && e.key === 'c') {
+        e.preventDefault();
+        copyRoomId();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       newSocket.disconnect();
       window.removeEventListener('mousemove', throttledMouseMove);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [roomId, username]);
+  }, [roomId, localUsername]);
 
   const [isDark, setIsDark] = useState(false);
 
@@ -388,7 +415,7 @@ export default function WorkspacePage({ params }) {
         </div>
 
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          <Chat socket={socket} roomId={roomId} username={username} users={users} />
+          <Chat socket={socket} roomId={roomId} username={localUsername} users={users} />
         </div>
       </div>
 
@@ -433,9 +460,16 @@ export default function WorkspacePage({ params }) {
             >
               <CheckSquare size={16} /> Task Board
             </button>
+            <button 
+              className={`btn ${activeTab === 'settings' ? 'btn-primary' : ''}`} 
+              style={{ padding: '0.35rem 0.6rem', borderRadius: '8px', background: activeTab === 'settings' ? '' : 'transparent', color: activeTab === 'settings' ? '' : 'var(--text-secondary)', border: activeTab === 'settings' ? 'none' : '1px solid transparent', boxShadow: 'none', fontSize: '0.8rem' }}
+              onClick={() => setActiveTab('settings')}
+            >
+              <SettingsIcon size={16} /> Settings
+            </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <VideoCall socket={socket} roomId={roomId} username={username} users={users} />
+            <VideoCall socket={socket} roomId={roomId} username={localUsername} users={users} />
             <button 
               onClick={copyRoomId}
               style={{ background: 'transparent', border: '1px dashed var(--border-color)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.825rem', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', transition: 'all 0.2s' }}
@@ -457,13 +491,16 @@ export default function WorkspacePage({ params }) {
         {/* Dynamic Content */}
         <div style={{ flex: 1, position: 'relative', background: 'var(--bg-color)', overflow: 'hidden' }}>
           <div style={{ display: activeTab === 'editor' ? 'block' : 'none', height: '100%' }}>
-            <CodeEditor roomId={roomId} username={username} />
+            <CodeEditor roomId={roomId} username={localUsername} />
           </div>
           <div style={{ display: activeTab === 'whiteboard' ? 'block' : 'none', height: '100%' }}>
             <Whiteboard roomId={roomId} />
           </div>
           <div style={{ display: activeTab === 'taskboard' ? 'block' : 'none', height: '100%' }}>
             <TaskBoard roomId={roomId} />
+          </div>
+          <div style={{ display: activeTab === 'settings' ? 'block' : 'none', height: '100%' }}>
+            <Settings socket={socket} username={localUsername} setUsername={setLocalUsername} />
           </div>
         </div>
       </div>
