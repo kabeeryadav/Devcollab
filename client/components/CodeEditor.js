@@ -310,12 +310,20 @@ export default function CodeEditor({ roomId, username }) {
     setIsRunning(true);
     setOutput('Running...');
     try {
-      const apiUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001') + '/api/execute';
+      const baseUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001').replace(/\/$/, '');
+      const apiUrl = `${baseUrl}/api/execute`;
+      
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language, code, stdin: stdinValue })
       });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server returned ${res.status}: ${errorText.substring(0, 100)}`);
+      }
+      
       const data = await res.json();
       setOutput(data.output || data.error);
     } catch (err) {
@@ -355,12 +363,20 @@ export default function CodeEditor({ roomId, username }) {
     setIsRunning(true);
     setOutput('Running Cell...');
     try {
-      const apiUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001') + '/api/execute';
+      const baseUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001').replace(/\/$/, '');
+      const apiUrl = `${baseUrl}/api/execute`;
+      
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: 'python', code: cellCode, stdin: stdinValue })
       });
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server returned ${res.status}: ${errorText.substring(0, 100)}`);
+      }
+      
       const data = await res.json();
       setOutput(`--- Cell Output ---\n${data.output || data.error}`);
     } catch (err) {
@@ -519,9 +535,31 @@ export default function CodeEditor({ roomId, username }) {
         />
 
         <div className="terminal-container" style={{ height: `${terminalHeight}px`, flexShrink: 0, borderTop: '1px solid var(--border-color)', background: 'var(--panel-bg)', padding: '0.5rem', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-           <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-             {['html', 'css'].includes(language) ? 'Live Web Preview' : 'Output Terminal'}
-           </h4>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <h4 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                {['html', 'css'].includes(language) ? 'Live Web Preview' : 'Output Terminal'}
+              </h4>
+              {!['html', 'css'].includes(language) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Input (stdin):</span>
+                  <input 
+                    type="text" 
+                    placeholder="Provide input here..." 
+                    value={stdinValue}
+                    onChange={(e) => setStdinValue(e.target.value)}
+                    style={{ 
+                      background: 'var(--bg-primary)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '4px', 
+                      padding: '2px 8px', 
+                      fontSize: '0.75rem', 
+                      color: 'var(--text-primary)',
+                      width: '180px'
+                    }}
+                  />
+                </div>
+              )}
+           </div>
            {['html', 'css'].includes(language) ? (
              <iframe 
                srcDoc={
