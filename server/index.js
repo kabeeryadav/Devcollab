@@ -320,7 +320,31 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint — powered by Wandbox API (free, no key needed)
+// Code Execution Endpoint — powered by Wandbox API
+// Cache wandbox compiler list
+let cachedCompilers = null;
+async function getWandboxCompilers() {
+  if (cachedCompilers) return cachedCompilers;
+  try {
+    const r = await fetch('https://wandbox.org/api/list.json');
+    const list = await r.json();
+    cachedCompilers = list;
+    return list;
+  } catch (e) {
+    return [];
+  }
+}
+
+// Pick the best matching compiler from Wandbox list for a given prefix (e.g. 'gcc', 'nodejs')
+function pickCompiler(list, prefix) {
+  // Prefer -head, then highest version
+  const matches = list.filter(c => c.name.startsWith(prefix));
+  const head = matches.find(c => c.name.includes('head'));
+  if (head) return head.name;
+  if (matches.length) return matches[matches.length - 1].name; // last = highest ver usually
+  return null;
+}
+
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
@@ -328,44 +352,52 @@ app.post('/api/execute', async (req, res) => {
   if (['html', 'css'].includes(language)) {
     return res.status(400).json({ error: 'Web languages are rendered in the browser.' });
   }
-
   if (language === 'sql') {
     return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  // Map Monaco language IDs -> Wandbox compiler names
-  const wandboxCompilerMap = {
-    javascript:  'nodejs-20.9.0',
-    typescript:  'typescript-5.2.2',
-    python:      'cpython-3.12.0',
-    jupyter:     'cpython-3.12.0',
-    c:           'gcc-head',
-    cpp:         'gcc-head',
-    java:        'openjdk-head',
-    csharp:      'mono-head',
-    ruby:        'ruby-3.2.2',
-    php:         'php-head',
-    go:          'go-head',
-    rust:        'rust-head',
-    swift:       'swift-head',
-    bash:        'bash',
+  // Map language -> Wandbox compiler prefix + extra options
+  const langConfig = {
+    javascript: { prefix: 'nodejs',      options: '' },
+    typescript: { prefix: 'typescript',  options: '' },
+    python:     { prefix: 'cpython',     options: '' },
+    jupyter:    { prefix: 'cpython',     options: '' },
+    c:          { prefix: 'gcc',         options: '-x c -std=c17' },  // -x c tells gcc to treat as C
+    cpp:        { prefix: 'gcc',         options: '-std=c++17' },
+    java:       { prefix: 'openjdk',     options: '' },
+    csharp:     { prefix: 'mono',        options: '' },
+    ruby:       { prefix: 'ruby',        options: '' },
+    php:        { prefix: 'php',         options: '' },
+    go:         { prefix: 'go',          options: '' },
+    rust:       { prefix: 'rust',        options: '' },
+    swift:      { prefix: 'swift',       options: '' },
+    bash:       { prefix: 'bash',        options: '' },
+    dart:       { prefix: null,          options: '' }, // Wandbox doesn't support Dart
   };
 
-  const compiler = wandboxCompilerMap[language];
-  if (!compiler) {
-    return res.status(400).json({ output: `Language "${language}" is not supported for execution.`, error: true });
+  const config = langConfig[language];
+  if (!config) {
+    return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
+  }
+  if (!config.prefix) {
+    return res.json({ output: `"${language}" is not supported by the execution sandbox yet.`, error: false });
   }
 
-  // Wandbox requires extra options for C (otherwise it defaults to C++)
-  const compilerOptions = language === 'c' ? '--language c' : '';
-
   try {
+    // Get the list and find the best compiler
+    const compilerList = await getWandboxCompilers();
+    const compiler = pickCompiler(compilerList, config.prefix);
+
+    if (!compiler) {
+      return res.status(500).json({ output: `Could not find a compiler for ${language}. Please try again later.`, error: true });
+    }
+
     const payload = {
       compiler,
       code,
       stdin: stdin || '',
-      'compiler-option-raw': compilerOptions,
-      'save': false,
+      'compiler-option-raw': config.options,
+      save: false,
     };
 
     const response = await fetch('https://wandbox.org/api/compile.json', {
@@ -376,17 +408,16 @@ app.post('/api/execute', async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      return res.status(500).json({ output: `Execution API error (${response.status}): ${errText.substring(0, 200)}`, error: true });
+      return res.status(500).json({ output: `Execution API error (${response.status}): ${errText.substring(0, 300)}`, error: true });
     }
 
     const data = await response.json();
 
-    // Build readable output from Wandbox response
     let output = '';
     if (data.compiler_error) {
       output += `[Compile Error]\n${data.compiler_error}\n`;
     }
-    if (data.compiler_message) {
+    if (data.compiler_message && !data.compiler_error) {
       output += data.compiler_message + '\n';
     }
     output += data.program_output || '';
@@ -397,7 +428,7 @@ app.post('/api/execute', async (req, res) => {
       output = '(No output)';
     }
 
-    const hasError = !!(data.compiler_error || data.program_error || data.status !== 0);
+    const hasError = !!(data.compiler_error || data.program_error);
     res.json({ output: output.trim(), error: hasError });
 
   } catch (err) {
