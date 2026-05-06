@@ -130,21 +130,12 @@ export default function CodeEditor({ roomId, username }) {
 
     // Track connection status
     wsProvider.on('status', event => {
+      console.log('Yjs Status:', event.status);
       setIsConnected(event.status === 'connected');
     });
 
-    settingsMap.observe((event) => {
-      if (settingsMap.has('language')) {
-        const sharedLang = settingsMap.get('language');
-        setLanguage(sharedLang);
-        if (monacoRef.current && editorRef.current) {
-          const monacoLang = sharedLang === 'jupyter' ? 'python' : sharedLang;
-          monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), monacoLang);
-        }
-      }
-    });
-
     wsProvider.on('sync', (isSynced) => {
+      console.log('Yjs Synced:', isSynced);
       if (isSynced) {
         if (model) {
           model.setEOL(monaco.editor.EndOfLineSequence.LF);
@@ -160,7 +151,24 @@ export default function CodeEditor({ roomId, username }) {
           }
         }
         if (type.length === 0) {
+          console.log('Inserting boilerplate...');
           type.insert(0, BOILERPLATES[settingsMap.get('language') || 'python'].replace(/\r\n/g, '\n'));
+        }
+      }
+    });
+    
+    wsProvider.on('connection-error', (err) => {
+      console.error('Yjs Connection Error:', err);
+    });
+
+    settingsMap.observe((event) => {
+      if (settingsMap.has('language')) {
+        const sharedLang = settingsMap.get('language');
+        console.log('Shared language updated:', sharedLang);
+        setLanguage(sharedLang);
+        if (monacoRef.current && editorRef.current) {
+          const monacoLang = sharedLang === 'jupyter' ? 'python' : sharedLang;
+          monacoRef.current.editor.setModelLanguage(editorRef.current.getModel(), monacoLang);
         }
       }
     });
