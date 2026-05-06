@@ -320,7 +320,7 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint — powered by Piston API (no compilers needed on server)
+// Code Execution Endpoint — powered by Wandbox API (free, no key needed)
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
@@ -333,81 +333,73 @@ app.post('/api/execute', async (req, res) => {
     return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  // Map Monaco language IDs -> Piston language names + versions
-  const pistonLangMap = {
-    javascript:  { language: 'javascript', version: '18.15.0' },
-    typescript:  { language: 'typescript', version: '5.0.3' },
-    python:      { language: 'python',     version: '3.10.0' },
-    jupyter:     { language: 'python',     version: '3.10.0' },
-    c:           { language: 'c',          version: '10.2.0' },
-    cpp:         { language: 'c++',        version: '10.2.0' },
-    java:        { language: 'java',       version: '15.0.2' },
-    csharp:      { language: 'csharp',     version: '6.12.0' },
-    dart:        { language: 'dart',       version: '2.19.6' },
-    rust:        { language: 'rust',       version: '1.68.2' },
-    go:          { language: 'go',         version: '1.16.2' },
-    kotlin:      { language: 'kotlin',     version: '1.8.20' },
-    swift:       { language: 'swift',      version: '5.8.1' },
-    ruby:        { language: 'ruby',       version: '3.0.1' },
-    php:         { language: 'php',        version: '8.2.3' },
-    r:           { language: 'r',          version: '4.1.1' },
-    bash:        { language: 'bash',       version: '5.2.0' },
+  // Map Monaco language IDs -> Wandbox compiler names
+  const wandboxCompilerMap = {
+    javascript:  'nodejs-20.9.0',
+    typescript:  'typescript-5.2.2',
+    python:      'cpython-3.12.0',
+    jupyter:     'cpython-3.12.0',
+    c:           'gcc-head',
+    cpp:         'gcc-head',
+    java:        'openjdk-head',
+    csharp:      'mono-head',
+    ruby:        'ruby-3.2.2',
+    php:         'php-head',
+    go:          'go-head',
+    rust:        'rust-head',
+    swift:       'swift-head',
+    bash:        'bash',
   };
 
-  const pistonLang = pistonLangMap[language];
-  if (!pistonLang) {
-    return res.status(400).json({ error: `Language "${language}" is not supported.` });
+  const compiler = wandboxCompilerMap[language];
+  if (!compiler) {
+    return res.status(400).json({ output: `Language "${language}" is not supported for execution.`, error: true });
   }
 
-  // For Java, the file must be named Main.java
-  const fileName = language === 'java' ? 'Main.java'
-    : language === 'typescript' ? 'code.ts'
-    : language === 'c' ? 'code.c'
-    : language === 'cpp' ? 'code.cpp'
-    : language === 'csharp' ? 'code.cs'
-    : language === 'dart' ? 'code.dart'
-    : `code.${language}`;
+  // Wandbox requires extra options for C (otherwise it defaults to C++)
+  const compilerOptions = language === 'c' ? '--language c' : '';
 
   try {
-    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+    const payload = {
+      compiler,
+      code,
+      stdin: stdin || '',
+      'compiler-option-raw': compilerOptions,
+      'save': false,
+    };
+
+    const response = await fetch('https://wandbox.org/api/compile.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: pistonLang.language,
-        version: pistonLang.version,
-        files: [{ name: fileName, content: code }],
-        stdin: stdin || '',
-        compile_timeout: 10000,
-        run_timeout: 5000,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      return res.status(500).json({ output: `Piston API error: ${errText}`, error: true });
+      return res.status(500).json({ output: `Execution API error (${response.status}): ${errText.substring(0, 200)}`, error: true });
     }
 
     const data = await response.json();
-    const runOutput = data.run || {};
-    const compileOutput = data.compile || {};
 
-    // Build readable output
+    // Build readable output from Wandbox response
     let output = '';
-    if (compileOutput.stderr) {
-      output += `[Compile Error]\n${compileOutput.stderr}\n`;
+    if (data.compiler_error) {
+      output += `[Compile Error]\n${data.compiler_error}\n`;
     }
-    if (compileOutput.stdout) {
-      output += compileOutput.stdout + '\n';
+    if (data.compiler_message) {
+      output += data.compiler_message + '\n';
     }
-    output += runOutput.stdout || '';
-    if (runOutput.stderr) {
-      output += `\n[Runtime Error]\n${runOutput.stderr}`;
+    output += data.program_output || '';
+    if (data.program_error) {
+      output += `\n[Runtime Error]\n${data.program_error}`;
     }
     if (!output.trim()) {
       output = '(No output)';
     }
 
-    res.json({ output: output.trim(), error: !!(compileOutput.stderr || runOutput.stderr) });
+    const hasError = !!(data.compiler_error || data.program_error || data.status !== 0);
+    res.json({ output: output.trim(), error: hasError });
+
   } catch (err) {
     res.status(500).json({ output: 'Execution service unreachable: ' + err.message, error: true });
   }
