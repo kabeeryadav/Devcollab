@@ -207,7 +207,13 @@ io.on('connection', (socket) => {
 
   // WebRTC Signaling (Voice Call)
   socket.on('join-voice', (roomId) => {
+    socket.join(`voice-${roomId}`);
+    // Notify others that I joined
     socket.to(roomId).emit('user-joined-voice', socket.id);
+    // Send me the list of people already in voice
+    const voiceUsers = Array.from(io.sockets.adapter.rooms.get(`voice-${roomId}`) || [])
+      .filter(id => id !== socket.id);
+    socket.emit('voice-users-list', voiceUsers);
   });
 
   socket.on('start-call', ({ roomId, username, type }) => {
@@ -332,33 +338,34 @@ app.post('/api/execute', (req, res) => {
   const filename = `code_${Date.now()}`;
   let filepath, command;
 
+  const isWin = os.platform() === 'win32';
+
   if (language === 'javascript') {
     filepath = path.join(tempDir, `${filename}.js`);
     command = `node ${filepath}`;
   } else if (language === 'python' || language === 'jupyter') {
     filepath = path.join(tempDir, `${filename}.py`);
-    command = `python ${filepath}`;
+    command = isWin ? `python ${filepath}` : `python3 ${filepath}`;
   } else if (language === 'typescript') {
     filepath = path.join(tempDir, `${filename}.ts`);
     command = `npx ts-node ${filepath}`;
   } else if (language === 'c') {
     filepath = path.join(tempDir, `${filename}.c`);
-    const outpath = path.join(tempDir, `${filename}.exe`);
-    command = `gcc ${filepath} -o ${outpath} && ${outpath}`;
+    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
+    command = isWin ? `gcc ${filepath} -o ${outpath} && ${outpath}` : `gcc ${filepath} -o ${outpath} && ./${path.basename(outpath)}`;
   } else if (language === 'cpp') {
     filepath = path.join(tempDir, `${filename}.cpp`);
-    const outpath = path.join(tempDir, `${filename}.exe`);
-    command = `g++ ${filepath} -o ${outpath} && ${outpath}`;
+    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
+    command = isWin ? `g++ ${filepath} -o ${outpath} && ${outpath}` : `g++ ${filepath} -o ${outpath} && ./${path.basename(outpath)}`;
   } else if (language === 'java') {
     const javaDir = path.join(tempDir, filename);
-    fs.mkdirSync(javaDir);
+    if (!fs.existsSync(javaDir)) fs.mkdirSync(javaDir);
     filepath = path.join(javaDir, 'Main.java');
-    // Using powershell syntax for cd and && doesn't always work cleanly, we can use child_process cwd
     command = `javac Main.java && java Main`;
   } else if (language === 'csharp') {
     filepath = path.join(tempDir, `${filename}.cs`);
-    const outpath = path.join(tempDir, `${filename}.exe`);
-    command = `csc ${filepath} /out:${outpath} && ${outpath}`;
+    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
+    command = isWin ? `csc ${filepath} /out:${outpath} && ${outpath}` : `mcs ${filepath} -out:${outpath} && mono ${outpath}`;
   } else if (language === 'dart') {
     filepath = path.join(tempDir, `${filename}.dart`);
     command = `dart run ${filepath}`;

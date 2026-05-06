@@ -29,7 +29,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     const handleSignal = async ({ from, signal }) => {
-      if (!inCall || !localStreamRef.current) return;
+      if (!inCall) return; // Must be "in call" UI-wise to receive signals
       let peerConnection = peersRef.current[from];
 
       if (signal.type === 'offer') {
@@ -62,6 +62,15 @@ export default function VideoCall({ socket, roomId, username, users }) {
       }
     };
 
+    const handleVoiceUsersList = (userIds) => {
+      if (!inCall || !localStreamRef.current) return;
+      userIds.forEach(userId => {
+        if (!peersRef.current[userId]) {
+          handleUserJoinedVoice(userId);
+        }
+      });
+    };
+
     const handleUserLeft = (userId) => {
       if (peersRef.current[userId]) {
         peersRef.current[userId].close();
@@ -71,12 +80,14 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     socket.on('user-joined-voice', handleUserJoinedVoice);
+    socket.on('voice-users-list', handleVoiceUsersList);
     socket.on('signal', handleSignal);
     socket.on('incoming-call', handleIncomingCall);
     socket.on('user-left', handleUserLeft);
 
     return () => {
       socket.off('user-joined-voice', handleUserJoinedVoice);
+      socket.off('voice-users-list', handleVoiceUsersList);
       socket.off('signal', handleSignal);
       socket.off('incoming-call', handleIncomingCall);
       socket.off('user-left', handleUserLeft);
