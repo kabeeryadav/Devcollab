@@ -320,31 +320,7 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint — powered by Wandbox API
-// Cache wandbox compiler list
-let cachedCompilers = null;
-async function getWandboxCompilers() {
-  if (cachedCompilers) return cachedCompilers;
-  try {
-    const r = await fetch('https://wandbox.org/api/list.json');
-    const list = await r.json();
-    cachedCompilers = list;
-    return list;
-  } catch (e) {
-    return [];
-  }
-}
-
-// Pick the best matching compiler from Wandbox list for a given prefix (e.g. 'gcc', 'nodejs')
-function pickCompiler(list, prefix) {
-  // Prefer -head, then highest version
-  const matches = list.filter(c => c.name.startsWith(prefix));
-  const head = matches.find(c => c.name.includes('head'));
-  if (head) return head.name;
-  if (matches.length) return matches[matches.length - 1].name; // last = highest ver usually
-  return null;
-}
-
+// Code Execution Endpoint — powered by JDoodle API (free, 200 runs/day)
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
@@ -356,79 +332,64 @@ app.post('/api/execute', async (req, res) => {
     return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  // Map language -> Wandbox compiler prefix + extra options
-  const langConfig = {
-    javascript: { prefix: 'nodejs',      options: '' },
-    typescript: { prefix: 'typescript',  options: '' },
-    python:     { prefix: 'cpython',     options: '' },
-    jupyter:    { prefix: 'cpython',     options: '' },
-    c:          { prefix: 'gcc',         options: '-x c -std=c17' },  // -x c tells gcc to treat as C
-    cpp:        { prefix: 'gcc',         options: '-std=c++17' },
-    java:       { prefix: 'openjdk',     options: '' },
-    csharp:     { prefix: 'mono',        options: '' },
-    ruby:       { prefix: 'ruby',        options: '' },
-    php:        { prefix: 'php',         options: '' },
-    go:         { prefix: 'go',          options: '' },
-    rust:       { prefix: 'rust',        options: '' },
-    swift:      { prefix: 'swift',       options: '' },
-    bash:       { prefix: 'bash',        options: '' },
-    dart:       { prefix: null,          options: '' }, // Wandbox doesn't support Dart
+  const clientId = process.env.JDOODLE_CLIENT_ID;
+  const clientSecret = process.env.JDOODLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return res.status(500).json({
+      output: '⚠️ Code execution is not configured.\n\nTo enable it:\n1. Visit https://www.jdoodle.com/compiler-api\n2. Create a free account\n3. Add JDOODLE_CLIENT_ID and JDOODLE_CLIENT_SECRET to your Render environment variables',
+      error: true
+    });
+  }
+
+  // Map Monaco language IDs -> JDoodle language + versionIndex
+  const jdoodleMap = {
+    javascript: { language: 'nodejs',      versionIndex: '4' },
+    typescript: { language: 'typescript',  versionIndex: '1' },
+    python:     { language: 'python3',     versionIndex: '4' },
+    jupyter:    { language: 'python3',     versionIndex: '4' },
+    c:          { language: 'c',           versionIndex: '5' },
+    cpp:        { language: 'cpp17',       versionIndex: '1' },
+    java:       { language: 'java',        versionIndex: '4' },
+    csharp:     { language: 'csharp',      versionIndex: '4' },
+    dart:       { language: 'dart',        versionIndex: '4' },
+    rust:       { language: 'rust',        versionIndex: '4' },
+    go:         { language: 'go',          versionIndex: '4' },
+    kotlin:     { language: 'kotlin',      versionIndex: '4' },
+    swift:      { language: 'swift',       versionIndex: '4' },
+    ruby:       { language: 'ruby',        versionIndex: '4' },
+    php:        { language: 'php',         versionIndex: '4' },
+    bash:       { language: 'bash',        versionIndex: '4' },
+    r:          { language: 'r',           versionIndex: '4' },
   };
 
-  const config = langConfig[language];
-  if (!config) {
-    return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
-  }
-  if (!config.prefix) {
-    return res.json({ output: `"${language}" is not supported by the execution sandbox yet.`, error: false });
+  const jdLang = jdoodleMap[language];
+  if (!jdLang) {
+    return res.status(400).json({ output: `Language "${language}" is not supported for execution.`, error: true });
   }
 
   try {
-    // Get the list and find the best compiler
-    const compilerList = await getWandboxCompilers();
-    const compiler = pickCompiler(compilerList, config.prefix);
-
-    if (!compiler) {
-      return res.status(500).json({ output: `Could not find a compiler for ${language}. Please try again later.`, error: true });
-    }
-
-    const payload = {
-      compiler,
-      code,
-      stdin: stdin || '',
-      'compiler-option-raw': config.options,
-      save: false,
-    };
-
-    const response = await fetch('https://wandbox.org/api/compile.json', {
+    const response = await fetch('https://api.jdoodle.com/v1/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        script: code,
+        language: jdLang.language,
+        versionIndex: jdLang.versionIndex,
+        clientId,
+        clientSecret,
+        stdin: stdin || '',
+      }),
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(500).json({ output: `Execution API error (${response.status}): ${errText.substring(0, 300)}`, error: true });
-    }
 
     const data = await response.json();
 
-    let output = '';
-    if (data.compiler_error) {
-      output += `[Compile Error]\n${data.compiler_error}\n`;
-    }
-    if (data.compiler_message && !data.compiler_error) {
-      output += data.compiler_message + '\n';
-    }
-    output += data.program_output || '';
-    if (data.program_error) {
-      output += `\n[Runtime Error]\n${data.program_error}`;
-    }
-    if (!output.trim()) {
-      output = '(No output)';
+    if (!response.ok || data.error) {
+      return res.json({ output: data.error || `API error: ${response.status}`, error: true });
     }
 
-    const hasError = !!(data.compiler_error || data.program_error);
+    const output = data.output || '(No output)';
+    const hasError = output.toLowerCase().includes('error') && data.statusCode !== 200;
     res.json({ output: output.trim(), error: hasError });
 
   } catch (err) {
