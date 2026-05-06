@@ -106,7 +106,9 @@ export default function CodeEditor({ roomId, username }) {
     }
 
     const doc = new Y.Doc();
-    const wsProvider = new WebsocketProvider('ws://localhost:3001/yjs', roomId, doc);
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    const wsUrl = socketUrl.replace('http', 'ws') + '/yjs';
+    const wsProvider = new WebsocketProvider(wsUrl, roomId, doc);
     
     const settingsMap = doc.getMap('settings');
     settingsMapRef.current = settingsMap;
@@ -277,7 +279,8 @@ export default function CodeEditor({ roomId, username }) {
     setIsRunning(true);
     setOutput('Running...');
     try {
-      const res = await fetch('http://localhost:3001/api/execute', {
+      const apiUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001') + '/api/execute';
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language, code, stdin: stdinValue })
@@ -321,7 +324,8 @@ export default function CodeEditor({ roomId, username }) {
     setIsRunning(true);
     setOutput('Running Cell...');
     try {
-      const res = await fetch('http://localhost:3001/api/execute', {
+      const apiUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001') + '/api/execute';
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: 'python', code: cellCode, stdin: stdinValue })

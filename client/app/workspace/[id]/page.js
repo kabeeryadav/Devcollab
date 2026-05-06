@@ -46,7 +46,8 @@ export default function WorkspacePage({ params }) {
   };
 
   useEffect(() => {
-    const newSocket = io('http://localhost:3001');
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
     mySocketId.current = newSocket.id;
 
