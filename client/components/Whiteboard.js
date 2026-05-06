@@ -321,7 +321,7 @@ export default function Whiteboard({ roomId }) {
           ref={canvasRef}
           width={2000}
           height={2000}
-          style={{ cursor: tool === 'text' ? 'text' : 'crosshair', background: 'var(--panel-bg)' }}
+          style={{ cursor: tool === 'text' ? 'text' : 'crosshair', background: '#0b0f1a' }}
           onClick={handleCanvasClick}
         />
         
