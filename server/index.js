@@ -351,12 +351,12 @@ app.post('/api/execute', (req, res) => {
     command = `npx ts-node ${filepath}`;
   } else if (language === 'c') {
     filepath = path.join(tempDir, `${filename}.c`);
-    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
-    command = isWin ? `gcc ${filepath} -o ${outpath} && ${outpath}` : `gcc ${filepath} -o ${outpath} && chmod +x ${outpath} && ${outpath}`;
+    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
+    command = isWin ? `gcc ${filename}.c -o ${outName} && ${outName}` : `gcc ${filename}.c -o ${outName} && chmod +x ${outName} && ./${outName}`;
   } else if (language === 'cpp') {
     filepath = path.join(tempDir, `${filename}.cpp`);
-    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
-    command = isWin ? `g++ ${filepath} -o ${outpath} && ${outpath}` : `g++ ${filepath} -o ${outpath} && chmod +x ${outpath} && ${outpath}`;
+    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
+    command = isWin ? `g++ ${filename}.cpp -o ${outName} && ${outName}` : `g++ ${filename}.cpp -o ${outName} && chmod +x ${outName} && ./${outName}`;
   } else if (language === 'java') {
     const javaDir = path.join(tempDir, filename);
     if (!fs.existsSync(javaDir)) fs.mkdirSync(javaDir);
@@ -364,8 +364,8 @@ app.post('/api/execute', (req, res) => {
     command = `javac Main.java && java Main`;
   } else if (language === 'csharp') {
     filepath = path.join(tempDir, `${filename}.cs`);
-    const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
-    command = isWin ? `csc ${filepath} /out:${outpath} && ${outpath}` : `mcs ${filepath} -out:${outpath} && mono ${outpath}`;
+    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
+    command = isWin ? `csc ${filename}.cs /out:${outName} && ${outName}` : `mcs ${filename}.cs -out:${outName} && mono ${outName}`;
   } else if (language === 'dart') {
     filepath = path.join(tempDir, `${filename}.dart`);
     command = `dart run ${filepath}`;
@@ -381,7 +381,7 @@ app.post('/api/execute', (req, res) => {
     try {
       const { spawn } = require('child_process');
       // Use shell to handle compound commands (gcc ... && ./out)
-      proc = spawn(command, [], { shell: true, cwd: language === 'java' ? path.dirname(filepath) : undefined, timeout: 10000 });
+      proc = spawn(command, [], { shell: true, cwd: path.dirname(filepath), timeout: 10000 });
     } catch (spawnErr) {
       return res.status(500).json({ error: 'Failed to spawn process: ' + spawnErr.message });
     }
