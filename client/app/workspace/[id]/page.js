@@ -324,7 +324,10 @@ export default function WorkspacePage({ params }) {
           width: isSidebarCollapsed ? (isMobile ? '320px' : '0px') : `${sidebarWidth}px`, 
           display: 'flex', 
           flexDirection: 'column', 
-          flexShrink: 0 
+          flexShrink: 0,
+          overflow: 'hidden',
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderRight: isSidebarCollapsed && !isMobile ? 'none' : '1px solid var(--border-color)'
         }}
       >
         <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
