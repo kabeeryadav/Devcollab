@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useEffect, useState, use, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -14,8 +14,7 @@ const VideoCall = dynamic(() => import('@/components/VideoCall'), { ssr: false }
 import { Code, LayoutDashboard, CheckSquare, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function WorkspacePage({ params }) {
-  const unwrappedParams = use(params);
-  const roomId = unwrappedParams.id;
+  const roomId = params.id;
   const searchParams = useSearchParams();
   const username = searchParams.get('username') || 'Anonymous';
   const router = useRouter();
