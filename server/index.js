@@ -320,7 +320,7 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint — powered by JDoodle API (free, 200 runs/day)
+// Code Execution Endpoint — local execution via Docker container compilers
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
@@ -332,70 +332,152 @@ app.post('/api/execute', async (req, res) => {
     return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  const clientId = process.env.JDOODLE_CLIENT_ID;
-  const clientSecret = process.env.JDOODLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    return res.status(500).json({
-      output: '⚠️ Code execution is not configured.\n\nTo enable it:\n1. Visit https://www.jdoodle.com/compiler-api\n2. Create a free account\n3. Add JDOODLE_CLIENT_ID and JDOODLE_CLIENT_SECRET to your Render environment variables',
-      error: true
-    });
-  }
-
-  // Map Monaco language IDs -> JDoodle language + versionIndex
-  const jdoodleMap = {
-    javascript: { language: 'nodejs',      versionIndex: '4' },
-    typescript: { language: 'typescript',  versionIndex: '1' },
-    python:     { language: 'python3',     versionIndex: '4' },
-    jupyter:    { language: 'python3',     versionIndex: '4' },
-    c:          { language: 'c',           versionIndex: '5' },
-    cpp:        { language: 'cpp17',       versionIndex: '1' },
-    java:       { language: 'java',        versionIndex: '4' },
-    csharp:     { language: 'csharp',      versionIndex: '4' },
-    dart:       { language: 'dart',        versionIndex: '4' },
-    rust:       { language: 'rust',        versionIndex: '4' },
-    go:         { language: 'go',          versionIndex: '4' },
-    kotlin:     { language: 'kotlin',      versionIndex: '4' },
-    swift:      { language: 'swift',       versionIndex: '4' },
-    ruby:       { language: 'ruby',        versionIndex: '4' },
-    php:        { language: 'php',         versionIndex: '4' },
-    bash:       { language: 'bash',        versionIndex: '4' },
-    r:          { language: 'r',           versionIndex: '4' },
-  };
-
-  const jdLang = jdoodleMap[language];
-  if (!jdLang) {
-    return res.status(400).json({ output: `Language "${language}" is not supported for execution.`, error: true });
-  }
+  const { spawn } = require('child_process');
+  const tmpDir = os.tmpdir();
+  const id = `prog_${Date.now()}`;
+  let filePath, cmd, cwd;
 
   try {
-    const response = await fetch('https://api.jdoodle.com/v1/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        script: code,
-        language: jdLang.language,
-        versionIndex: jdLang.versionIndex,
-        clientId,
-        clientSecret,
-        stdin: stdin || '',
-      }),
-    });
+    switch (language) {
+      case 'python':
+      case 'jupyter':
+        filePath = path.join(tmpDir, `${id}.py`);
+        await fs.promises.writeFile(filePath, code);
+        cmd = ['python3', filePath];
+        cwd = tmpDir;
+        break;
 
-    const data = await response.json();
+      case 'javascript':
+        filePath = path.join(tmpDir, `${id}.js`);
+        await fs.promises.writeFile(filePath, code);
+        cmd = ['node', filePath];
+        cwd = tmpDir;
+        break;
 
-    if (!response.ok || data.error) {
-      return res.json({ output: data.error || `API error: ${response.status}`, error: true });
+      case 'typescript': {
+        filePath = path.join(tmpDir, `${id}.ts`);
+        await fs.promises.writeFile(filePath, code);
+        // ts-node installed globally in Docker
+        cmd = ['ts-node', '--skip-project', filePath];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'c': {
+        filePath = path.join(tmpDir, `${id}.c`);
+        const outC = path.join(tmpDir, `${id}_c.out`);
+        await fs.promises.writeFile(filePath, code);
+        // Compile then run
+        const compileC = await runProc(['gcc', filePath, '-o', outC, '-lm'], tmpDir, '');
+        if (compileC.stderr && !compileC.stdout) {
+          return res.json({ output: `[Compile Error]\n${compileC.stderr}`, error: true });
+        }
+        cmd = [outC];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'cpp': {
+        filePath = path.join(tmpDir, `${id}.cpp`);
+        const outCpp = path.join(tmpDir, `${id}_cpp.out`);
+        await fs.promises.writeFile(filePath, code);
+        const compileCpp = await runProc(['g++', filePath, '-o', outCpp, '-std=c++17'], tmpDir, '');
+        if (compileCpp.stderr && !compileCpp.stdout) {
+          return res.json({ output: `[Compile Error]\n${compileCpp.stderr}`, error: true });
+        }
+        cmd = [outCpp];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'java': {
+        const javaDir = path.join(tmpDir, id);
+        await fs.promises.mkdir(javaDir, { recursive: true });
+        filePath = path.join(javaDir, 'Main.java');
+        await fs.promises.writeFile(filePath, code);
+        const compileJava = await runProc(['javac', 'Main.java'], javaDir, '');
+        if (compileJava.stderr && compileJava.exitCode !== 0) {
+          return res.json({ output: `[Compile Error]\n${compileJava.stderr}`, error: true });
+        }
+        cmd = ['java', '-cp', javaDir, 'Main'];
+        cwd = javaDir;
+        break;
+      }
+
+      case 'csharp': {
+        filePath = path.join(tmpDir, `${id}.cs`);
+        const outCs = path.join(tmpDir, `${id}.exe`);
+        await fs.promises.writeFile(filePath, code);
+        const compileCs = await runProc(['mcs', filePath, `-out:${outCs}`], tmpDir, '');
+        if (compileCs.stderr && compileCs.exitCode !== 0) {
+          return res.json({ output: `[Compile Error]\n${compileCs.stderr}`, error: true });
+        }
+        cmd = ['mono', outCs];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'go': {
+        filePath = path.join(tmpDir, `${id}.go`);
+        await fs.promises.writeFile(filePath, code);
+        cmd = ['go', 'run', filePath];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'ruby': {
+        filePath = path.join(tmpDir, `${id}.rb`);
+        await fs.promises.writeFile(filePath, code);
+        cmd = ['ruby', filePath];
+        cwd = tmpDir;
+        break;
+      }
+
+      case 'php': {
+        filePath = path.join(tmpDir, `${id}.php`);
+        await fs.promises.writeFile(filePath, code);
+        cmd = ['php', filePath];
+        cwd = tmpDir;
+        break;
+      }
+
+      default:
+        return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
     }
 
-    const output = data.output || '(No output)';
-    const hasError = output.toLowerCase().includes('error') && data.statusCode !== 200;
-    res.json({ output: output.trim(), error: hasError });
+    // Run the program
+    const result = await runProc(cmd, cwd, stdin || '');
+
+    let output = result.stdout || '';
+    if (result.stderr) output += (output ? '\n' : '') + `[stderr]\n${result.stderr}`;
+    if (!output.trim()) output = '(No output)';
+
+    res.json({ output: output.trim(), error: result.exitCode !== 0 });
 
   } catch (err) {
-    res.status(500).json({ output: 'Execution service unreachable: ' + err.message, error: true });
+    res.status(500).json({ output: 'Execution failed: ' + err.message, error: true });
   }
 });
+
+// Helper: run a process and collect output
+function runProc(cmd, cwd, stdin) {
+  return new Promise((resolve) => {
+    const proc = spawn(cmd[0], cmd.slice(1), {
+      cwd,
+      timeout: 15000,
+      env: { ...process.env, JAVA_TOOL_OPTIONS: '-Xmx256m' }
+    });
+
+    if (stdin) proc.stdin.write(stdin);
+    proc.stdin.end();
+
+    let stdout = '', stderr = '';
+    proc.stdout.on('data', d => { stdout += d.toString(); });
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.on('close', exitCode => resolve({ stdout, stderr, exitCode }));
+    proc.on('error', err => resolve({ stdout: '', stderr: err.message, exitCode: 1 }));
+  });
+}
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
