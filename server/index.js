@@ -37,8 +37,10 @@ server.on('upgrade', (request, socket, head) => {
 
   if (pathname.startsWith('/yjs')) {
     wss.handleUpgrade(request, socket, head, (ws) => {
-      console.log(`Yjs websocket connection established for: ${pathname}`);
-      wss.emit('connection', ws, request);
+      // Strip the /yjs prefix so that setupWSConnection sees a clean room name
+      request.url = request.url.replace(/^\/yjs/, '') || '/';
+      console.log(`Yjs connection established for room: ${request.url}`);
+      setupWSConnection(ws, request);
     });
   } else {
     // Socket.io handles its own upgrades if the path is /socket.io/
