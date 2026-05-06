@@ -11,6 +11,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
   const [streams, setStreams] = useState([]); // Array of { id, stream, isLocal, name }
   
   const localStreamRef = useRef(null);
+  const inCallRef = useRef(false);
   const peersRef = useRef({});
 
   const configuration = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
@@ -19,7 +20,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
     if (!socket) return;
 
     const handleUserJoinedVoice = async (userId) => {
-      if (!inCall || !localStreamRef.current) return;
+      if (!inCallRef.current || !localStreamRef.current) return;
       const peerConnection = createPeerConnection(userId);
       peersRef.current[userId] = peerConnection;
 
@@ -29,7 +30,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     const handleSignal = async ({ from, signal }) => {
-      if (!inCall) return; // Must be "in call" UI-wise to receive signals
+      if (!inCallRef.current) return; // Must be "in call" UI-wise to receive signals
       let peerConnection = peersRef.current[from];
 
       if (signal.type === 'offer') {
@@ -63,7 +64,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     const handleVoiceUsersList = (userIds) => {
-      if (!inCall || !localStreamRef.current) return;
+      if (!inCallRef.current || !localStreamRef.current) return;
       userIds.forEach(userId => {
         if (!peersRef.current[userId]) {
           handleUserJoinedVoice(userId);
@@ -142,6 +143,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
       setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
       setCallType(type);
       setInCall(true);
+      inCallRef.current = true;
       if (socket) {
         socket.emit('start-call', { roomId, username, type });
         socket.emit('join-voice', roomId);
@@ -160,6 +162,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
       setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
       setCallType(type);
       setInCall(true);
+      inCallRef.current = true;
       if (socket) {
         socket.emit('join-voice', roomId);
       }
@@ -174,6 +177,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
 
   const leaveCall = () => {
     setInCall(false);
+    inCallRef.current = false;
     setCallType(null);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
