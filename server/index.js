@@ -320,103 +320,97 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint
-app.post('/api/execute', (req, res) => {
+// Code Execution Endpoint — powered by Piston API (no compilers needed on server)
+app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
 
-  // Web languages shouldn't hit the backend usually, but just in case
   if (['html', 'css'].includes(language)) {
     return res.status(400).json({ error: 'Web languages are rendered in the browser.' });
   }
 
   if (language === 'sql') {
-    return res.json({ output: 'SQL execution is temporarily disabled on the live server. It will be back soon!', error: false });
+    return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  const tempDir = os.tmpdir();
-  const filename = `code_${Date.now()}`;
-  let filepath, command;
+  // Map Monaco language IDs -> Piston language names + versions
+  const pistonLangMap = {
+    javascript:  { language: 'javascript', version: '18.15.0' },
+    typescript:  { language: 'typescript', version: '5.0.3' },
+    python:      { language: 'python',     version: '3.10.0' },
+    jupyter:     { language: 'python',     version: '3.10.0' },
+    c:           { language: 'c',          version: '10.2.0' },
+    cpp:         { language: 'c++',        version: '10.2.0' },
+    java:        { language: 'java',       version: '15.0.2' },
+    csharp:      { language: 'csharp',     version: '6.12.0' },
+    dart:        { language: 'dart',       version: '2.19.6' },
+    rust:        { language: 'rust',       version: '1.68.2' },
+    go:          { language: 'go',         version: '1.16.2' },
+    kotlin:      { language: 'kotlin',     version: '1.8.20' },
+    swift:       { language: 'swift',      version: '5.8.1' },
+    ruby:        { language: 'ruby',       version: '3.0.1' },
+    php:         { language: 'php',        version: '8.2.3' },
+    r:           { language: 'r',          version: '4.1.1' },
+    bash:        { language: 'bash',       version: '5.2.0' },
+  };
 
-  const isWin = os.platform() === 'win32';
-
-  if (language === 'javascript') {
-    filepath = path.join(tempDir, `${filename}.js`);
-    command = `node ${filepath}`;
-  } else if (language === 'python' || language === 'jupyter') {
-    filepath = path.join(tempDir, `${filename}.py`);
-    command = isWin ? `python ${filepath}` : `python3 ${filepath}`;
-  } else if (language === 'typescript') {
-    filepath = path.join(tempDir, `${filename}.ts`);
-    command = `npx ts-node ${filepath}`;
-  } else if (language === 'c') {
-    filepath = path.join(tempDir, `${filename}.c`);
-    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
-    command = isWin ? `gcc ${filename}.c -o ${outName} && ${outName}` : `gcc ${filename}.c -o ${outName} && chmod +x ${outName} && ./${outName}`;
-  } else if (language === 'cpp') {
-    filepath = path.join(tempDir, `${filename}.cpp`);
-    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
-    command = isWin ? `g++ ${filename}.cpp -o ${outName} && ${outName}` : `g++ ${filename}.cpp -o ${outName} && chmod +x ${outName} && ./${outName}`;
-  } else if (language === 'java') {
-    const javaDir = path.join(tempDir, filename);
-    if (!fs.existsSync(javaDir)) fs.mkdirSync(javaDir);
-    filepath = path.join(javaDir, 'Main.java');
-    command = `javac Main.java && java Main`;
-  } else if (language === 'csharp') {
-    filepath = path.join(tempDir, `${filename}.cs`);
-    const outName = isWin ? `${filename}.exe` : `${filename}.out`;
-    command = isWin ? `csc ${filename}.cs /out:${outName} && ${outName}` : `mcs ${filename}.cs -out:${outName} && mono ${outName}`;
-  } else if (language === 'dart') {
-    filepath = path.join(tempDir, `${filename}.dart`);
-    command = `dart run ${filepath}`;
-  } else {
-    return res.status(400).json({ error: 'Unsupported backend language' });
+  const pistonLang = pistonLangMap[language];
+  if (!pistonLang) {
+    return res.status(400).json({ error: `Language "${language}" is not supported.` });
   }
 
-  fs.writeFile(filepath, code, (err) => {
-    if (err) return res.status(500).json({ error: 'Failed to write file' });
+  // For Java, the file must be named Main.java
+  const fileName = language === 'java' ? 'Main.java'
+    : language === 'typescript' ? 'code.ts'
+    : language === 'c' ? 'code.c'
+    : language === 'cpp' ? 'code.cpp'
+    : language === 'csharp' ? 'code.cs'
+    : language === 'dart' ? 'code.dart'
+    : `code.${language}`;
 
-    const parts = command.split(' ');
-    let proc;
-    try {
-      const { spawn } = require('child_process');
-      // Use shell to handle compound commands (gcc ... && ./out)
-      proc = spawn(command, [], { shell: true, cwd: path.dirname(filepath), timeout: 10000 });
-    } catch (spawnErr) {
-      return res.status(500).json({ error: 'Failed to spawn process: ' + spawnErr.message });
-    }
-
-    // Pipe stdin if provided
-    if (stdin) {
-      proc.stdin.write(stdin);
-    }
-    proc.stdin.end();
-
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      // Clean up temp files
-      try {
-        if (language === 'java') {
-          fs.rmSync(path.dirname(filepath), { recursive: true, force: true });
-        } else {
-          fs.unlinkSync(filepath);
-        }
-      } catch (e) { /* ignore cleanup errors */ }
-
-      if (code !== 0 && !stdout) {
-        return res.json({ output: stderr || `Process exited with code ${code}`, error: true });
-      }
-      res.json({ output: stdout + (stderr ? '\n[stderr]: ' + stderr : ''), error: code !== 0 });
+  try {
+    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: pistonLang.language,
+        version: pistonLang.version,
+        files: [{ name: fileName, content: code }],
+        stdin: stdin || '',
+        compile_timeout: 10000,
+        run_timeout: 5000,
+      }),
     });
 
-    proc.on('error', (err) => {
-      res.json({ output: err.message, error: true });
-    });
-  });
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(500).json({ output: `Piston API error: ${errText}`, error: true });
+    }
+
+    const data = await response.json();
+    const runOutput = data.run || {};
+    const compileOutput = data.compile || {};
+
+    // Build readable output
+    let output = '';
+    if (compileOutput.stderr) {
+      output += `[Compile Error]\n${compileOutput.stderr}\n`;
+    }
+    if (compileOutput.stdout) {
+      output += compileOutput.stdout + '\n';
+    }
+    output += runOutput.stdout || '';
+    if (runOutput.stderr) {
+      output += `\n[Runtime Error]\n${runOutput.stderr}`;
+    }
+    if (!output.trim()) {
+      output = '(No output)';
+    }
+
+    res.json({ output: output.trim(), error: !!(compileOutput.stderr || runOutput.stderr) });
+  } catch (err) {
+    res.status(500).json({ output: 'Execution service unreachable: ' + err.message, error: true });
+  }
 });
 
 const PORT = process.env.PORT || 3001;
