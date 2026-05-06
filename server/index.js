@@ -352,11 +352,11 @@ app.post('/api/execute', (req, res) => {
   } else if (language === 'c') {
     filepath = path.join(tempDir, `${filename}.c`);
     const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
-    command = isWin ? `gcc ${filepath} -o ${outpath} && ${outpath}` : `gcc ${filepath} -o ${outpath} && ./${path.basename(outpath)}`;
+    command = isWin ? `gcc ${filepath} -o ${outpath} && ${outpath}` : `gcc ${filepath} -o ${outpath} && chmod +x ${outpath} && ${outpath}`;
   } else if (language === 'cpp') {
     filepath = path.join(tempDir, `${filename}.cpp`);
     const outpath = isWin ? path.join(tempDir, `${filename}.exe`) : path.join(tempDir, `${filename}.out`);
-    command = isWin ? `g++ ${filepath} -o ${outpath} && ${outpath}` : `g++ ${filepath} -o ${outpath} && ./${path.basename(outpath)}`;
+    command = isWin ? `g++ ${filepath} -o ${outpath} && ${outpath}` : `g++ ${filepath} -o ${outpath} && chmod +x ${outpath} && ${outpath}`;
   } else if (language === 'java') {
     const javaDir = path.join(tempDir, filename);
     if (!fs.existsSync(javaDir)) fs.mkdirSync(javaDir);
