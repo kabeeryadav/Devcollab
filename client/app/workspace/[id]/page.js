@@ -365,9 +365,16 @@ export default function WorkspacePage({ params }) {
           >
             <Monitor size={18} /> Dev Collab
           </h2>
-          <button onClick={() => { if(confirm('Leave this session?')) router.push('/'); }} className="btn-icon" title="Leave Session" style={{ color: 'var(--danger)' }}>
-            <LogOut size={16} />
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {isMobile && (
+              <button onClick={() => setIsSidebarCollapsed(true)} className="btn-icon" title="Close Sidebar">
+                <X size={18} />
+              </button>
+            )}
+            <button onClick={() => { if(confirm('Leave this session?')) router.push('/'); }} className="btn-icon" title="Leave Session" style={{ color: 'var(--danger)' }}>
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Online Members Panel */}
@@ -513,7 +520,7 @@ export default function WorkspacePage({ params }) {
           style={{ 
             left: `${cursor.x * 100}%`,
             top: `${cursor.y * 100}%`,
-            display: recentlyJoined.has(id) ? 'none' : 'block' // hide for a moment if they just joined (optional)
+            display: recentlyJoined.has(id) ? 'none' : 'block' 
           }}
         >
           <svg viewBox="0 0 24 24" fill={cursor.color}>
@@ -524,6 +531,45 @@ export default function WorkspacePage({ params }) {
           </div>
         </div>
       ))}
+
+      {/* Mobile Bottom Navigation */}
+      <div className="mobile-bottom-nav">
+        <button 
+          className={`mobile-nav-item ${activeTab === 'editor' ? 'active' : ''}`}
+          onClick={() => setActiveTab('editor')}
+        >
+          <Code size={20} />
+          <span>Editor</span>
+        </button>
+        <button 
+          className={`mobile-nav-item ${activeTab === 'whiteboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('whiteboard')}
+        >
+          <LayoutDashboard size={20} />
+          <span>Draw</span>
+        </button>
+        <button 
+          className={`mobile-nav-item ${activeTab === 'taskboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('taskboard')}
+        >
+          <CheckSquare size={20} />
+          <span>Tasks</span>
+        </button>
+        <button 
+          className="mobile-nav-item"
+          onClick={() => setIsSidebarCollapsed(false)}
+        >
+          <Users size={20} />
+          <span>Chat</span>
+        </button>
+        <button 
+          className={`mobile-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          <SettingsIcon size={20} />
+          <span>Set</span>
+        </button>
+      </div>
     </div>
   );
 }

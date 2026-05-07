@@ -350,81 +350,95 @@ body.dragging * {
 }
 
 /* Responsive adjustments for Laptop, Tablet, and Mobile sizes */
-@media (max-width: 1024px) {
+/* --- MOBILE UI OVERHAUL --- */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  /* Sidebar as a Drawer */
   .sidebar {
-    position: fixed;
+    position: fixed !important;
     left: 0;
     top: 0;
     bottom: 0;
-    z-index: 1000;
-    box-shadow: 4px 0 20px rgba(0,0,0,0.2);
-    transition: transform var(--transition-normal);
-  }
-
-  .sidebar.collapsed {
+    width: 280px !important;
     transform: translateX(-100%);
+    z-index: 2000 !important;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.3);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
-  .resizer-vertical {
-    display: none !important;
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
   }
-}
 
-@media (max-width: 768px) {
+  /* Compact Header */
   .workspace-header {
-    padding: 0.5rem !important;
-    gap: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    height: 48px;
+    overflow: hidden;
   }
 
-  .workspace-header > div {
-    width: 100%;
-    justify-content: center;
+  .workspace-header .btn {
+    display: none !important; /* Hide tabs from top header on mobile */
   }
 
-  .btn {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.8rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .workspace-header {
-    flex-direction: column !important;
-  }
-
+  .workspace-header .switch, 
   .workspace-header .btn-icon {
-    position: absolute;
-    left: 1rem;
-    top: 0.75rem;
+    display: flex !important;
   }
 
-  .workspace-header > div:first-child {
-    padding-left: 2.5rem;
-    overflow-x: auto;
-    justify-content: flex-start;
-    padding-bottom: 0.25rem;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .workspace-header > div:first-child::-webkit-scrollbar {
-    display: none;
-  }
-
-  .workspace-header > div:last-child {
+  /* Floating Bottom Navigation */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--panel-bg);
     border-top: 1px solid var(--border-color);
-    padding-top: 0.5rem;
-    font-size: 0.75rem;
+    z-index: 1500;
+    padding: 0.5rem;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
   }
 
-  /* Code Editor Mobile Tweaks */
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--accent-color);
+  }
+
+  /* Main Content Adjustments */
+  .main-content {
+    padding-bottom: 60px; /* Space for bottom nav */
+  }
+
+  /* Editor Toolbar Scrollable */
   .editor-toolbar {
     padding: 0.5rem !important;
-    overflow-x: auto;
-    white-space: nowrap;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
     display: flex !important;
     flex-wrap: nowrap !important;
     justify-content: flex-start !important;
     -webkit-overflow-scrolling: touch;
+    gap: 0.5rem !important;
   }
 
   .editor-toolbar::-webkit-scrollbar {
@@ -432,33 +446,20 @@ body.dragging * {
   }
 
   .editor-toolbar .btn {
-    flex-shrink: 0;
+    padding: 0.35rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    flex-shrink: 0 !important;
   }
 
-  /* Terminal height on mobile */
+  /* Terminal for Mobile */
   .terminal-container {
-    height: 180px !important;
-  }
-
-  /* Video Call Floating Grid */
-  .video-grid-floating {
-    right: 1rem !important;
-    left: 1rem !important;
-    bottom: 1rem !important;
-    min-width: 0 !important;
-    width: auto !important;
+    height: 160px !important;
   }
 }
 
-@media (max-width: 320px) {
-  .workspace-header > div:first-child {
-    gap: 0.25rem !important;
-  }
-  
-  .btn {
-    padding: 0.35rem 0.5rem;
-    font-size: 0.7rem;
-  }
+/* Hide bottom nav on desktop */
+.mobile-bottom-nav {
+  display: none;
 }
 
 /* Hide any Next.js / Turbopack dev overlay badge or indicator */
