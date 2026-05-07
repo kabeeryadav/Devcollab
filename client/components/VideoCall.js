@@ -33,7 +33,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit('signal', { to: userId, signal: offer });
+      socket.emit('signal', { to: userId, signal: { type: 'offer', sdp: offer } });
     };
 
     const handleSignal = async ({ from, signal }) => {
@@ -51,13 +51,13 @@ export default function VideoCall({ socket, roomId, username, users }) {
         pc = createPeerConnection(from);
         peersRef.current[from] = pc;
         
-        await pc.setRemoteDescription(new RTCSessionDescription(signal));
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        socket.emit('signal', { to: from, signal: answer });
+        socket.emit('signal', { to: from, signal: { type: 'answer', sdp: answer } });
       } else if (signal.type === 'answer') {
         if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         }
       } else if (signal.type === 'ice-candidate') {
         if (pc) {
@@ -119,11 +119,12 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     pc.ontrack = (event) => {
-      console.log(`Received track from ${userId}: ${event.track.kind}`);
+      console.log(`Received track from ${userId}`);
       setStreams(prev => {
-        const otherStreams = prev.filter(s => s.id !== userId);
-        return [...otherStreams, { id: userId, stream: event.streams[0], isLocal: false }];
+        if (prev.find(s => s.id === userId)) return prev;
+        return [...prev, { id: userId, stream: event.streams[0], isLocal: false }];
       });
+      
     };
 
     if (localStreamRef.current) {
