@@ -252,16 +252,17 @@ export default function VideoCall({ socket, roomId, username, users }) {
       {inCall && (
         <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-end' }}>
           <div style={{ 
-            display: 'grid', 
+            display: streamTypeDisplay(streams), 
             gridTemplateColumns: streams.length > 2 ? 'repeat(2, 1fr)' : '1fr',
             gap: '0.5rem', 
             maxWidth: '500px'
           }}>
             {streams.map(s => (
-              <VideoRenderer 
+              <MediaRenderer 
                 key={s.id} 
                 stream={s.stream} 
                 isLocal={s.isLocal} 
+                type={callType}
                 name={s.isLocal ? 'You' : (users.find(u => u.id === s.id)?.username || 'User')} 
               />
             ))}
@@ -271,8 +272,10 @@ export default function VideoCall({ socket, roomId, username, users }) {
             background: 'rgba(15, 23, 42, 0.9)', padding: '0.75rem 1.5rem', borderRadius: '99px',
             display: 'flex', gap: '1rem', border: '1px solid #334155', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
           }}>
-            <button onClick={toggleMute} style={{ background: isMuted ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isMuted ? <MicOff size={20} /> : <Mic size={20} />}</button>
-            <button onClick={toggleVideo} style={{ background: isVideoOff ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isVideoOff ? <VideoOff size={20} /> : <VideoIcon size={20} />}</button>
+            <button onClick={toggleMute} title="Toggle Mute" style={{ background: isMuted ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isMuted ? <MicOff size={20} /> : <Mic size={20} />}</button>
+            {callType === 'video' && (
+              <button onClick={toggleVideo} title="Toggle Video" style={{ background: isVideoOff ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isVideoOff ? <VideoOff size={20} /> : <VideoIcon size={20} />}</button>
+            )}
             <div style={{ width: '1px', background: '#334155' }}></div>
             <button onClick={leaveCall} style={{ background: '#ef4444', border: 'none', padding: '0.2rem 1rem', borderRadius: '99px', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>Leave</button>
           </div>
@@ -293,11 +296,36 @@ export default function VideoCall({ socket, roomId, username, users }) {
   );
 }
 
-function VideoRenderer({ stream, isLocal, name }) {
+function MediaRenderer({ stream, isLocal, name, type }) {
   const videoRef = useRef(null);
   useEffect(() => {
-    if (videoRef.current && stream) videoRef.current.srcObject = stream;
-  }, [stream]);
+    if (videoRef.current && stream && type === 'video') {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, type]);
+
+  if (type === 'audio') {
+    return (
+      <div style={{ 
+        width: '180px', height: '60px', background: 'rgba(30, 41, 59, 0.8)', 
+        borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '0 1rem', 
+        gap: '0.75rem', border: '1px solid #475569', backdropFilter: 'blur(8px)',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)'
+      }}>
+        <div style={{ 
+          width: '32px', height: '32px', borderRadius: '50%', background: '#6366f1', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, color: '#fff' 
+        }}>
+          {name.charAt(0).toUpperCase()}
+        </div>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
+          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Voice active</div>
+        </div>
+        <Headphones size={14} color="#6366f1" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '220px', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden', position: 'relative', border: '1px solid #334155' }}>
@@ -305,4 +333,8 @@ function VideoRenderer({ stream, isLocal, name }) {
       <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '0.1rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem' }}>{name}</div>
     </div>
   );
+}
+
+function streamTypeDisplay(streams) {
+  return streams.length > 0 ? 'grid' : 'none';
 }
