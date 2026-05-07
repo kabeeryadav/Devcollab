@@ -4,15 +4,16 @@ import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneCall, PhoneOff, PhoneIn
 
 export default function VideoCall({ socket, roomId, username, users }) {
   const [inCall, setInCall] = useState(false);
-  const [callType, setCallType] = useState(null); // 'audio' | 'video'
+  const [callType, setCallType] = useState(null); 
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [incomingCall, setIncomingCall] = useState(null);
-  const [streams, setStreams] = useState([]); // Array of { id, stream, isLocal, name }
+  const [streams, setStreams] = useState([]); 
   
   const localStreamRef = useRef(null);
   const inCallRef = useRef(false);
   const peersRef = useRef({});
+  const pendingSignals = useRef({}); // userId -> Array of signals
 
   const configuration = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
 
@@ -21,35 +22,46 @@ export default function VideoCall({ socket, roomId, username, users }) {
 
     const handleUserJoinedVoice = async (userId) => {
       if (!inCallRef.current || !localStreamRef.current) return;
-      const peerConnection = createPeerConnection(userId);
-      peersRef.current[userId] = peerConnection;
+      
+      // If we are already connected to this user, ignore
+      if (peersRef.current[userId]) return;
 
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
+      console.log(`Creating offer for new user: ${userId}`);
+      const pc = createPeerConnection(userId);
+      peersRef.current[userId] = pc;
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
       socket.emit('signal', { to: userId, signal: { type: 'offer', sdp: offer } });
     };
 
     const handleSignal = async ({ from, signal }) => {
-      if (!inCallRef.current) return; // Must be "in call" UI-wise to receive signals
-      let peerConnection = peersRef.current[from];
+      if (!inCallRef.current) {
+        // Queue signals if we aren't "in call" yet but might be soon
+        if (!pendingSignals.current[from]) pendingSignals.current[from] = [];
+        pendingSignals.current[from].push(signal);
+        return;
+      }
+
+      let pc = peersRef.current[from];
 
       if (signal.type === 'offer') {
-        if (!peerConnection) {
-           peerConnection = createPeerConnection(from);
-           peersRef.current[from] = peerConnection;
-        }
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+        if (pc) pc.close();
+        pc = createPeerConnection(from);
+        peersRef.current[from] = pc;
+        
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
         socket.emit('signal', { to: from, signal: { type: 'answer', sdp: answer } });
       } else if (signal.type === 'answer') {
-        if (peerConnection) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         }
       } else if (signal.type === 'ice-candidate') {
-        if (peerConnection) {
+        if (pc) {
           try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
           } catch (e) {
             console.error('Error adding ice candidate', e);
           }
@@ -58,7 +70,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     const handleIncomingCall = ({ callerId, callerName, type }) => {
-      if (!inCall) {
+      if (!inCallRef.current) {
         setIncomingCall({ callerId, callerName, type });
       }
     };
@@ -66,18 +78,19 @@ export default function VideoCall({ socket, roomId, username, users }) {
     const handleVoiceUsersList = (userIds) => {
       if (!inCallRef.current || !localStreamRef.current) return;
       userIds.forEach(userId => {
-        if (!peersRef.current[userId]) {
-          handleUserJoinedVoice(userId);
-        }
+        handleUserJoinedVoice(userId);
       });
     };
 
     const handleUserLeft = (userId) => {
+      console.log(`User left call: ${userId}`);
       if (peersRef.current[userId]) {
         peersRef.current[userId].close();
         delete peersRef.current[userId];
       }
       setStreams(prev => prev.filter(s => s.id !== userId));
+      const audioEl = document.getElementById(`audio-${userId}`);
+      if (audioEl) audioEl.remove();
     };
 
     socket.on('user-joined-voice', handleUserJoinedVoice);
@@ -93,7 +106,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
       socket.off('incoming-call', handleIncomingCall);
       socket.off('user-left', handleUserLeft);
     };
-  }, [socket, inCall]);
+  }, [socket]);
 
   const createPeerConnection = (userId) => {
     const pc = new RTCPeerConnection(configuration);
@@ -105,11 +118,12 @@ export default function VideoCall({ socket, roomId, username, users }) {
     };
 
     pc.ontrack = (event) => {
+      console.log(`Received track from ${userId}`);
       setStreams(prev => {
         if (prev.find(s => s.id === userId)) return prev;
-        return [...prev, { id: userId, stream: event.streams[0], isLocal: false, name: '' }];
+        return [...prev, { id: userId, stream: event.streams[0], isLocal: false }];
       });
-      // Always play audio (if any) to ensure we hear them even if we don't render video grid
+      
       const stream = event.streams[0];
       if (stream.getAudioTracks().length > 0) {
         playAudioStream(userId, stream);
@@ -136,44 +150,43 @@ export default function VideoCall({ socket, roomId, username, users }) {
     audio.srcObject = stream;
   };
 
+  const processPendingSignals = async (userId) => {
+    if (pendingSignals.current[userId]) {
+      for (const signal of pendingSignals.current[userId]) {
+        await handleSignal({ from: userId, signal });
+      }
+      delete pendingSignals.current[userId];
+    }
+  };
+
   const startCall = async (type) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: type === 'video', 
+        audio: true 
+      });
       localStreamRef.current = stream;
-      setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
-      setCallType(type);
       setInCall(true);
       inCallRef.current = true;
-      if (socket) {
-        socket.emit('start-call', { roomId, username, type });
-        socket.emit('join-voice', roomId);
-      }
+      setCallType(type);
+      setStreams([{ id: socket.id, stream, isLocal: true }]);
+      
+      socket.emit('start-call', { roomId, username, type });
+      socket.emit('join-voice', roomId);
     } catch (err) {
-      alert("Could not access camera/microphone.");
+      console.error(err);
+      alert("Camera/Mic access denied.");
     }
   };
 
   const acceptCall = async () => {
+    if (!incomingCall) return;
     const type = incomingCall.type;
     setIncomingCall(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
-      localStreamRef.current = stream;
-      setStreams([{ id: socket?.id || 'local', stream, isLocal: true, name: username }]);
-      setCallType(type);
-      setInCall(true);
-      inCallRef.current = true;
-      if (socket) {
-        socket.emit('join-voice', roomId);
-      }
-    } catch (err) {
-      alert("Could not access camera/microphone.");
-    }
+    await startCall(type);
   };
 
-  const declineCall = () => {
-    setIncomingCall(null);
-  };
+  const declineCall = () => setIncomingCall(null);
 
   const leaveCall = () => {
     setInCall(false);
@@ -181,29 +194,33 @@ export default function VideoCall({ socket, roomId, username, users }) {
     setCallType(null);
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
     }
-    Object.values(peersRef.current).forEach(pc => pc.close());
+    Object.keys(peersRef.current).forEach(userId => {
+      peersRef.current[userId].close();
+    });
     peersRef.current = {};
     setStreams([]);
     document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
+    socket.emit('user-left', socket.id); // Notify others via server
   };
 
   const toggleMute = () => {
     if (localStreamRef.current) {
-      const audioTrack = localStreamRef.current.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
+      const track = localStreamRef.current.getAudioTracks()[0];
+      if (track) {
+        track.enabled = !track.enabled;
+        setIsMuted(!track.enabled);
       }
     }
   };
 
   const toggleVideo = () => {
     if (localStreamRef.current) {
-      const videoTrack = localStreamRef.current.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
+      const track = localStreamRef.current.getVideoTracks()[0];
+      if (track) {
+        track.enabled = !track.enabled;
+        setIsVideoOff(!track.enabled);
       }
     }
   };
@@ -211,102 +228,67 @@ export default function VideoCall({ socket, roomId, username, users }) {
   return (
     <>
       {incomingCall && (
-        <div style={{ position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)', background: 'var(--panel-bg)', padding: '1rem', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 1000, animation: 'slideDown 0.3s ease-out' }}>
-          <div style={{ background: 'var(--primary-color)', color: '#fff', padding: '0.5rem', borderRadius: '50%', display: 'flex', animation: 'pulse 1.5s infinite' }}>
-            {incomingCall.type === 'video' ? <VideoIcon size={20} /> : <PhoneIncoming size={20} />}
+        <div className="incoming-call-toast" style={{
+          position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)',
+          padding: '1rem 1.5rem', borderRadius: '12px', border: '1px solid #334155',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '1.25rem', color: '#fff'
+        }}>
+          <div style={{ background: '#6366f1', padding: '0.75rem', borderRadius: '50%', animation: 'pulse 2s infinite' }}>
+            <PhoneIncoming size={20} />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>Incoming {incomingCall.type === 'video' ? 'Video' : 'Audio'} Call</h4>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{incomingCall.callerName} is calling the group...</p>
+            <div style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Incoming Call</div>
+            <div style={{ fontSize: '1rem', fontWeight: 600 }}>{incomingCall.callerName}</div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1rem' }}>
-            <button onClick={declineCall} className="btn btn-danger" style={{ padding: '0.4rem', borderRadius: '50%', display: 'flex' }} title="Decline">
-              <X size={16} />
-            </button>
-            <button onClick={acceptCall} className="btn" style={{ background: 'var(--success)', color: '#fff', padding: '0.4rem', borderRadius: '50%', display: 'flex', border: 'none' }} title="Accept">
-              {incomingCall.type === 'video' ? <VideoIcon size={16} /> : <PhoneCall size={16} />}
-            </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={declineCall} style={{ background: '#ef4444', border: 'none', padding: '0.6rem', borderRadius: '50%', color: '#fff', cursor: 'pointer' }}><X size={18} /></button>
+            <button onClick={acceptCall} style={{ background: '#10b981', border: 'none', padding: '0.6rem', borderRadius: '50%', color: '#fff', cursor: 'pointer' }}><Check size={18} /></button>
           </div>
         </div>
       )}
 
-      {/* Floating Video Grid for Video Calls */}
-      {inCall && callType === 'video' && (
-        <div className="video-grid-floating" style={{ 
-          position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 900,
-          background: 'rgba(20, 20, 20, 0.7)', backdropFilter: 'blur(10px)',
-          padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: '300px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Users size={16} /> Team Video ({streams.length})
-            </h4>
-          </div>
+      {inCall && (
+        <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-end' }}>
           <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '0.75rem', 
-            maxHeight: '70vh', 
-            overflowY: 'auto',
-            paddingRight: '4px' 
+            display: 'grid', 
+            gridTemplateColumns: streams.length > 2 ? 'repeat(2, 1fr)' : '1fr',
+            gap: '0.5rem', 
+            maxWidth: '500px'
           }}>
-            {streams.map((streamObj) => {
-              const remoteUser = users.find(u => u.id === streamObj.id);
-              const displayName = streamObj.isLocal ? 'You' : (remoteUser?.username || 'Remote');
-              return (
-                <VideoRenderer 
-                  key={streamObj.id} 
-                  stream={streamObj.stream} 
-                  isLocal={streamObj.isLocal} 
-                  name={displayName} 
-                />
-              );
-            })}
+            {streams.map(s => (
+              <VideoRenderer 
+                key={s.id} 
+                stream={s.stream} 
+                isLocal={s.isLocal} 
+                name={s.isLocal ? 'You' : (users.find(u => u.id === s.id)?.username || 'User')} 
+              />
+            ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <button onClick={toggleMute} className="btn" style={{ background: isMuted ? 'var(--danger)' : '#333', color: '#fff', border: 'none', padding: '0.5rem', borderRadius: '50%' }}>
-              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
-            </button>
-            <button onClick={toggleVideo} className="btn" style={{ background: isVideoOff ? 'var(--danger)' : '#333', color: '#fff', border: 'none', padding: '0.5rem', borderRadius: '50%' }}>
-              {isVideoOff ? <VideoOff size={18} /> : <VideoIcon size={18} />}
-            </button>
-            <button onClick={leaveCall} className="btn btn-danger" style={{ padding: '0.5rem 1rem', borderRadius: '24px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <PhoneOff size={16} /> Leave
-            </button>
+          
+          <div style={{ 
+            background: 'rgba(15, 23, 42, 0.9)', padding: '0.75rem 1.5rem', borderRadius: '99px',
+            display: 'flex', gap: '1rem', border: '1px solid #334155', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <button onClick={toggleMute} style={{ background: isMuted ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isMuted ? <MicOff size={20} /> : <Mic size={20} />}</button>
+            <button onClick={toggleVideo} style={{ background: isVideoOff ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}>{isVideoOff ? <VideoOff size={20} /> : <VideoIcon size={20} />}</button>
+            <div style={{ width: '1px', background: '#334155' }}></div>
+            <button onClick={leaveCall} style={{ background: '#ef4444', border: 'none', padding: '0.2rem 1rem', borderRadius: '99px', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}>Leave</button>
           </div>
         </div>
       )}
 
-      {/* Header Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        {!inCall ? (
-          <>
-            <button onClick={() => startCall('audio')} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-              <Headphones size={16} /> Audio Call
-            </button>
-            <button onClick={() => startCall('video')} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-              <VideoIcon size={16} /> Video Call
-            </button>
-          </>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', animation: 'pulse 1.5s infinite' }}></span> {callType === 'video' ? 'Video' : 'Audio'} Live ({streams.length})
-            </span>
-            {callType === 'audio' && (
-              <>
-                <button onClick={toggleMute} className="btn" style={{ background: isMuted ? 'var(--danger)' : 'var(--panel-bg)', color: isMuted ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0.4rem', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
-                </button>
-                <button onClick={leaveCall} className="btn btn-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                  <PhoneOff size={16} /> Leave
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {!inCall && (
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={() => startCall('audio')} style={{ background: 'transparent', border: '1px solid #e2e8f0', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <Headphones size={14} /> Audio Call
+          </button>
+          <button onClick={() => startCall('video')} style={{ background: 'transparent', border: '1px solid #e2e8f0', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <VideoIcon size={14} /> Video Call
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -316,43 +298,11 @@ function VideoRenderer({ stream, isLocal, name }) {
   useEffect(() => {
     if (videoRef.current && stream) videoRef.current.srcObject = stream;
   }, [stream]);
+
   return (
-    <div style={{ 
-      position: 'relative', 
-      borderRadius: '12px', 
-      overflow: 'hidden', 
-      background: '#111', 
-      aspectRatio: '16/9',
-      width: '240px',
-      border: '2px solid rgba(255,255,255,0.1)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-    }}>
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted={isLocal} 
-        style={{ 
-          width: '100%', 
-          height: '100%', 
-          objectFit: 'contain', 
-          transform: isLocal ? 'scaleX(-1)' : 'none' 
-        }} 
-      />
-      <div style={{ 
-        position: 'absolute', 
-        bottom: '8px', 
-        left: '8px', 
-        background: 'rgba(0,0,0,0.6)', 
-        color: '#fff', 
-        fontSize: '0.75rem', 
-        padding: '2px 8px', 
-        borderRadius: '6px',
-        fontWeight: 500,
-        backdropFilter: 'blur(4px)'
-      }}>
-        {name}
-      </div>
+    <div style={{ width: '220px', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden', position: 'relative', border: '1px solid #334155' }}>
+      <video ref={videoRef} autoPlay playsInline muted={isLocal} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: isLocal ? 'scaleX(-1)' : 'none' }} />
+      <div style={{ position: 'absolute', bottom: '0.5rem', left: '0.5rem', background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '0.1rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem' }}>{name}</div>
     </div>
   );
 }

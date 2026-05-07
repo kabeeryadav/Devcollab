@@ -294,6 +294,9 @@ io.on('connection', (socket) => {
         }
       }
       
+      // Notify others that this user left voice/room
+      io.to(roomId).emit('user-left', socket.id);
+      
       const getUserList = (rId) => Array.from(activeUsers.entries())
         .filter(([id, u]) => u.roomId === rId)
         .map(([id, u]) => ({ id, ...u }));
