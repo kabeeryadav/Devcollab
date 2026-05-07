@@ -328,7 +328,6 @@ const WANDBOX_COMPILER_MAP = {
   python:     'cpython-3.12.7',
   jupyter:    'cpython-3.12.7',
   javascript: 'nodejs-20.17.0',
-  typescript: 'typescript-5.6.2', 
   c:          'gcc-13.2.0-c',
   cpp:        'gcc-13.2.0',
   java:       'openjdk-jdk-21+35',
