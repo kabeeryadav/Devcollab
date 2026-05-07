@@ -125,10 +125,6 @@ export default function VideoCall({ socket, roomId, username, users }) {
         return [...prev, { id: userId, stream: event.streams[0], isLocal: false }];
       });
       
-      const stream = event.streams[0];
-      if (stream.getAudioTracks().length > 0) {
-        playAudioStream(userId, stream);
-      }
     };
 
     if (localStreamRef.current) {
@@ -137,19 +133,12 @@ export default function VideoCall({ socket, roomId, username, users }) {
       });
     }
 
+    // Process any signals that arrived before we were in the call
+    processPendingSignals(userId);
+
     return pc;
   };
 
-  const playAudioStream = (id, stream) => {
-    let audio = document.getElementById(`audio-${id}`);
-    if (!audio) {
-      audio = document.createElement('audio');
-      audio.id = `audio-${id}`;
-      audio.autoplay = true;
-      document.body.appendChild(audio);
-    }
-    audio.srcObject = stream;
-  };
 
   const processPendingSignals = async (userId) => {
     if (pendingSignals.current[userId]) {
@@ -312,11 +301,15 @@ export default function VideoCall({ socket, roomId, username, users }) {
 
 function MediaRenderer({ stream, isLocal, name, type, isPinned, onPin }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
+
   useEffect(() => {
-    if (videoRef.current && stream && type === 'video') {
+    if (type === 'video' && videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+    } else if (type === 'audio' && audioRef.current && stream && !isLocal) {
+      audioRef.current.srcObject = stream;
     }
-  }, [stream, type]);
+  }, [stream, type, isLocal]);
 
   if (type === 'audio') {
     return (
@@ -331,6 +324,7 @@ function MediaRenderer({ stream, isLocal, name, type, isPinned, onPin }) {
           cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >
+        {!isLocal && <audio ref={audioRef} autoPlay />}
         <div style={{ 
           width: isPinned ? '40px' : '32px', height: isPinned ? '40px' : '32px', 
           borderRadius: '50%', background: '#6366f1', 
