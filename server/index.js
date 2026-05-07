@@ -7,8 +7,9 @@ const pty = require('node-pty');
 const WebSocket = require('ws');
 const { setupWSConnection } = require('y-websocket/bin/utils');
 
-// Execution API (Wandbox - Reliable and Free)
+// Execution APIs
 const WANDBOX_URL = 'https://wandbox.org/api/compile.json';
+const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
 
 const app = express();
 app.use(cors());
@@ -324,86 +325,62 @@ function generatedCode() {
 
 // ─── Language map: our language name → Wandbox compiler names ───────
 const WANDBOX_COMPILER_MAP = {
-  python:     'cpython-3.14.0',
-  jupyter:    'cpython-3.14.0',
+  python:     'cpython-3.12.7',
+  jupyter:    'cpython-3.12.7',
   javascript: 'nodejs-20.17.0',
-  typescript: 'typescript-head', 
+  typescript: 'typescript-5.6.2', 
   c:          'gcc-13.2.0-c',
   cpp:        'gcc-13.2.0',
-  java:       'openjdk-jdk-22+36',
+  java:       'openjdk-jdk-21+35',
   go:         'go-1.23.2',
-  ruby:       'ruby-4.0.2',
+  ruby:       'ruby-3.3.11',
   php:        'php-8.3.12',
   rust:       'rust-1.82.0',
   bash:       'bash',
+  csharp:     'mono-6.12.0.199',
+  sql:        'sqlite-3.46.1',
 };
 
-// Code Execution Endpoint — powered by Wandbox API
+// Code Execution Endpoint — powered by Wandbox & Piston
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
 
+  // 1. Try Wandbox first if supported
   const compiler = WANDBOX_COMPILER_MAP[language];
-  if (!compiler) {
-    return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
+  if (compiler) {
+    try {
+      const response = await fetch(WANDBOX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          compiler: compiler,
+          code: code,
+          stdin: stdin || '',
+          save: false,
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        let output = '';
+        if (data.compiler_error) output += `[Compiler Error]\n${data.compiler_error}\n`;
+        if (data.program_output) output += data.program_output;
+        if (data.program_error) output += (output ? '\n' : '') + data.program_error;
+        
+        if (!output.trim()) output = data.status === "0" ? "(No output)" : `(Exit status: ${data.status})`;
+        return res.json({ output: output.trim(), error: data.status !== "0" });
+      }
+    } catch (err) {
+      console.error("Wandbox failed, falling back...", err.message);
+    }
   }
 
-  try {
-    const response = await fetch(WANDBOX_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        compiler: compiler,
-        code: code,
-        stdin: stdin || '',
-        save: false,
-      })
-    });
-
-    if (!response.ok) throw new Error(`Wandbox status: ${response.status}`);
-    const data = await response.json();
-
-    // Wandbox returns program_output, program_error, etc.
-    let output = '';
-    if (data.compiler_error) output += `[Compiler Error]\n${data.compiler_error}\n`;
-    if (data.program_output) output += data.program_output;
-    if (data.program_error) output += (output ? '\n' : '') + data.program_error;
-    
-    if (!output.trim()) output = data.status === "0" ? "(No output)" : `(Exit status: ${data.status})`;
-
-    res.json({ output: output.trim(), error: data.status !== "0" });
-
-  } catch (err) {
-    console.error("Wandbox failed:", err.message);
-    res.status(500).json({ output: 'Execution service error. Please try again.', error: true });
-  }
-});
-
-async function tryPiston(pistonLang, filename, code, stdin) {
-  const response = await fetch(PISTON_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      language: pistonLang.language,
-      version: pistonLang.version,
-      files: [{ name: filename, content: code }],
-      stdin: stdin || '',
-      run_timeout: 10000
-    })
+  res.status(400).json({ 
+    output: `Language "${language}" is not supported or execution service is down. (Note: Dart is currently unsupported as Piston API is now restricted).`, 
+    error: true 
   });
-
-  if (!response.ok) throw new Error(`Piston status: ${response.status}`);
-  const data = await response.json();
-
-  let output = '';
-  if (data.compile && data.compile.stderr) output += `[Compile Error]\n${data.compile.stderr}\n`;
-  if (data.run) {
-    output += (data.run.stdout || '') + (data.run.stderr || '');
-    if (!output.trim()) output = data.run.code === 0 ? '(No output)' : `(Process exited with code ${data.run.code})`;
-    return { output: output.trim(), error: data.run.code !== 0 };
-  }
-  return { output: output.trim() || 'No response from runner', error: true };
-}
+});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

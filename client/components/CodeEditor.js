@@ -325,7 +325,7 @@ export default function CodeEditor({ roomId, username }) {
       }
       
       const data = await res.json();
-      setOutput(data.output || data.error);
+      setOutput(data.output || (data.error ? 'Execution failed without output.' : '(No output)'));
     } catch (err) {
       setOutput('Failed to execute code: ' + err.message);
     } finally {
@@ -378,7 +378,7 @@ export default function CodeEditor({ roomId, username }) {
       }
       
       const data = await res.json();
-      setOutput(`--- Cell Output ---\n${data.output || data.error}`);
+      setOutput(`--- Cell Output ---\n${data.output || (data.error ? 'Execution failed.' : '(No output)')}`);
     } catch (err) {
       setOutput('Failed to execute cell: ' + err.message);
     } finally {
