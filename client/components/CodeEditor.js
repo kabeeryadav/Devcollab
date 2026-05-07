@@ -210,6 +210,15 @@ export default function CodeEditor({ roomId, username }) {
     }
   };
 
+  const handleReset = () => {
+    if (editorRef.current && monacoRef.current && typeRef.current) {
+      const model = editorRef.current.getModel();
+      typeRef.current.delete(0, typeRef.current.length);
+      typeRef.current.insert(0, BOILERPLATES[language].replace(/\r\n/g, '\n'));
+      model.setEOL(monacoRef.current.editor.EndOfLineSequence.LF);
+    }
+  };
+
   const handleBeautify = () => {
     if (!editorRef.current) return;
     // Monaco built-in formatter only works for JS/TS/HTML/CSS
@@ -476,7 +485,7 @@ export default function CodeEditor({ roomId, username }) {
             <Download size={14} /> Download
           </button>
 
-          <button className="btn" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={() => { if(confirm('Reset code to boilerplate?')) handleLanguageChange(language); }}>
+          <button className="btn" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={() => { if(confirm('Reset code to boilerplate?')) handleReset(); }}>
              Reset
           </button>
         </div>
