@@ -12,7 +12,7 @@ const Chat = dynamic(() => import('@/components/Chat'), { ssr: false });
 const Whiteboard = dynamic(() => import('@/components/Whiteboard'), { ssr: false });
 const VideoCall = dynamic(() => import('@/components/VideoCall'), { ssr: false });
 const Settings = dynamic(() => import('@/components/Settings'), { ssr: false });
-import { Code, LayoutDashboard, CheckSquare, Settings as SettingsIcon, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck } from 'lucide-react';
+import { Code, LayoutDashboard, CheckSquare, Settings as SettingsIcon, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck, Users } from 'lucide-react';
 
 export default function WorkspacePage({ params }) {
   const roomId = params.id;
