@@ -343,8 +343,13 @@ const WANDBOX_COMPILER_MAP = {
 
 // Code Execution Endpoint — powered by Wandbox & Piston
 app.post('/api/execute', async (req, res) => {
-  const { language, code, stdin } = req.body;
+  let { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
+
+  // Java fix: Wandbox saves as prog.java, so public classes must be named prog.
+  if (language === 'java') {
+    code = code.replace(/public\s+class/g, 'class');
+  }
 
   // 1. Try Wandbox first if supported
   const compiler = WANDBOX_COMPILER_MAP[language];
