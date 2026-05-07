@@ -239,7 +239,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
         </div>
       )}
 
-      {inCall && (
+      {inCall && callType === 'video' && (
         <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-end' }}>
           <div style={{ 
             display: streamTypeDisplay(streams), 
@@ -252,7 +252,6 @@ export default function VideoCall({ socket, roomId, username, users }) {
             padding: '4px',
             scrollbarWidth: 'none'
           }}>
-            {/* If pinned, show pinned first, then others */}
             {[...streams].sort((a, b) => {
               if (a.id === pinnedId) return -1;
               if (b.id === pinnedId) return 1;
@@ -276,25 +275,48 @@ export default function VideoCall({ socket, roomId, username, users }) {
             backdropFilter: 'blur(12px)'
           }}>
             <button onClick={toggleMute} title="Toggle Mute" style={{ background: isMuted ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{isMuted ? <MicOff size={20} /> : <Mic size={20} />}</button>
-            {callType === 'video' && (
-              <button onClick={toggleVideo} title="Toggle Video" style={{ background: isVideoOff ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{isVideoOff ? <VideoOff size={20} /> : <VideoIcon size={20} />}</button>
-            )}
+            <button onClick={toggleVideo} title="Toggle Video" style={{ background: isVideoOff ? '#ef4444' : 'transparent', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>{isVideoOff ? <VideoOff size={20} /> : <VideoIcon size={20} />}</button>
             <div style={{ width: '1px', background: '#334155' }}></div>
             <button onClick={leaveCall} style={{ background: '#ef4444', border: 'none', padding: '0.4rem 1.25rem', borderRadius: '99px', color: '#fff', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s' }}>Leave</button>
           </div>
         </div>
       )}
 
-      {!inCall && (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={() => startCall('audio')} style={{ background: 'transparent', border: '1px solid #e2e8f0', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-            <Headphones size={14} /> Audio Call
-          </button>
-          <button onClick={() => startCall('video')} style={{ background: 'transparent', border: '1px solid #e2e8f0', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-            <VideoIcon size={14} /> Video Call
-          </button>
-        </div>
-      )}
+      {/* Header UI for Audio Call or Buttons for Starting Call */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {!inCall ? (
+          <>
+            <button onClick={() => startCall('audio')} style={{ background: 'transparent', border: '1px solid var(--border-color)', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+              <Headphones size={14} /> Audio Call
+            </button>
+            <button onClick={() => startCall('video')} style={{ background: 'transparent', border: '1px solid var(--border-color)', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+              <VideoIcon size={14} /> Video Call
+            </button>
+          </>
+        ) : (
+          callType === 'audio' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--panel-bg)', padding: '4px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s infinite' }}></span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>Audio Live ({streams.length})</span>
+              </div>
+              <div style={{ width: '1px', height: '16px', background: 'var(--border-color)' }}></div>
+              <button onClick={toggleMute} style={{ background: isMuted ? '#ef4444' : 'transparent', border: 'none', color: isMuted ? '#fff' : 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '4px' }}>
+                {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+              <button onClick={leaveCall} style={{ background: '#ef4444', border: 'none', padding: '4px 10px', borderRadius: '6px', color: '#fff', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}>
+                End
+              </button>
+              {/* Invisible audio renderers to keep audio track attached */}
+              <div style={{ display: 'none' }}>
+                {streams.filter(s => !s.isLocal).map(s => (
+                  <MediaRenderer key={s.id} stream={s.stream} type="audio" name={s.name || 'User'} isLocal={false} />
+                ))}
+              </div>
+            </div>
+          )
+        )}
+      </div>
     </>
   );
 }
