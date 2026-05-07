@@ -239,22 +239,63 @@ export default function VideoCall({ socket, roomId, username, users }) {
     <>
       {incomingCall && (
         <div className="incoming-call-toast" style={{
-          position: 'fixed', top: '1rem', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)',
-          padding: '1rem 1.5rem', borderRadius: '12px', border: '1px solid #334155',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', gap: '1.25rem', color: '#fff'
+          position: 'fixed', top: '1.5rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(16px)',
+          padding: '1rem 1.25rem', borderRadius: '20px', border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.5)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', gap: '1rem', color: '#fff',
+          minWidth: '320px', animation: 'slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>
-          <div style={{ background: '#6366f1', padding: '0.75rem', borderRadius: '50%', animation: 'pulse 2s infinite' }}>
-            <PhoneIncoming size={20} />
+          <style>{`
+            @keyframes slideDown {
+              from { transform: translate(-50%, -100%); opacity: 0; }
+              to { transform: translate(-50%, 0); opacity: 1; }
+            }
+            @keyframes ring {
+              0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+              70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+            }
+          `}</style>
+          
+          <div style={{ 
+            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+            width: '48px', height: '48px', borderRadius: '16px', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'ring 2s infinite'
+          }}>
+            {incomingCall.type === 'video' ? <VideoIcon size={24} /> : <PhoneIncoming size={24} />}
           </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Incoming Call</div>
-            <div style={{ fontSize: '1rem', fontWeight: 600 }}>{incomingCall.callerName}</div>
+          
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '2px' }}>
+              Incoming {incomingCall.type} Call
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 600, color: '#f8fafc' }}>{incomingCall.callerName}</div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={declineCall} style={{ background: '#ef4444', border: 'none', padding: '0.6rem', borderRadius: '50%', color: '#fff', cursor: 'pointer' }}><X size={18} /></button>
-            <button onClick={acceptCall} style={{ background: '#10b981', border: 'none', padding: '0.6rem', borderRadius: '50%', color: '#fff', cursor: 'pointer' }}><Check size={18} /></button>
+          
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              onClick={declineCall} 
+              style={{ 
+                background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', 
+                padding: '0.6rem', borderRadius: '12px', color: '#ef4444', cursor: 'pointer',
+                transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              <X size={20} />
+            </button>
+            <button 
+              onClick={acceptCall} 
+              style={{ 
+                background: '#10b981', border: 'none', padding: '0.6rem', 
+                borderRadius: '12px', color: '#fff', cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}
+            >
+              <Check size={20} />
+            </button>
           </div>
         </div>
       )}
