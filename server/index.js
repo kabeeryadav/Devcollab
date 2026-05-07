@@ -6,10 +6,9 @@ const os = require('os');
 const pty = require('node-pty');
 const WebSocket = require('ws');
 const { setupWSConnection } = require('y-websocket/bin/utils');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-// const sqlite3 = require('sqlite3').verbose(); // Temporarily disabled due to build errors
+// Code execution now uses Piston API (free, no API key needed)
+// https://github.com/engineer-man/piston
+const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
 
 const app = express();
 app.use(cors());
@@ -320,7 +319,34 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// Code Execution Endpoint — local execution via Docker container compilers
+// ─── Language map: our language name → Piston runtime name + version ───────
+const PISTON_LANG_MAP = {
+  python:     { language: 'python',     version: '3.10.0' },
+  jupyter:    { language: 'python',     version: '3.10.0' },
+  javascript: { language: 'javascript', version: '18.15.0' },
+  typescript: { language: 'typescript', version: '5.0.3' },
+  c:          { language: 'c',          version: '10.2.0' },
+  cpp:        { language: 'c++',        version: '10.2.0' },
+  java:       { language: 'java',       version: '15.0.2' },
+  csharp:     { language: 'csharp',     version: '6.12.0' },
+  go:         { language: 'go',         version: '1.16.2' },
+  ruby:       { language: 'ruby',       version: '3.0.1' },
+  php:        { language: 'php',        version: '8.2.3' },
+  rust:       { language: 'rust',       version: '1.50.0' },
+  kotlin:     { language: 'kotlin',     version: '1.8.20' },
+  swift:      { language: 'swift',      version: '5.3.3' },
+  bash:       { language: 'bash',       version: '5.2.0' },
+};
+
+// File extension map for Piston
+const LANG_EXT = {
+  python: 'py', jupyter: 'py', javascript: 'js', typescript: 'ts',
+  c: 'c', cpp: 'cpp', java: 'java', csharp: 'cs',
+  go: 'go', ruby: 'rb', php: 'php', rust: 'rs',
+  kotlin: 'kt', swift: 'swift', bash: 'sh',
+};
+
+// Code Execution Endpoint — powered by Piston API (free, no Docker needed)
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
@@ -332,152 +358,71 @@ app.post('/api/execute', async (req, res) => {
     return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
   }
 
-  const { spawn } = require('child_process');
-  const tmpDir = os.tmpdir();
-  const id = `prog_${Date.now()}`;
-  let filePath, cmd, cwd;
+  const pistonLang = PISTON_LANG_MAP[language];
+  if (!pistonLang) {
+    return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
+  }
+
+  const ext = LANG_EXT[language] || 'txt';
+  // Java requires the file to be named Main.java
+  const filename = language === 'java' ? 'Main.java' : `code.${ext}`;
 
   try {
-    switch (language) {
-      case 'python':
-      case 'jupyter':
-        filePath = path.join(tmpDir, `${id}.py`);
-        await fs.promises.writeFile(filePath, code);
-        cmd = ['python3', filePath];
-        cwd = tmpDir;
-        break;
+    const pistonRes = await fetch(PISTON_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: pistonLang.language,
+        version: pistonLang.version,
+        files: [{ name: filename, content: code }],
+        stdin: stdin || '',
+        run_timeout: 10000,   // 10 second max run time
+        compile_timeout: 15000
+      })
+    });
 
-      case 'javascript':
-        filePath = path.join(tmpDir, `${id}.js`);
-        await fs.promises.writeFile(filePath, code);
-        cmd = ['node', filePath];
-        cwd = tmpDir;
-        break;
-
-      case 'typescript': {
-        filePath = path.join(tmpDir, `${id}.ts`);
-        await fs.promises.writeFile(filePath, code);
-        // ts-node installed globally in Docker
-        cmd = ['ts-node', '--skip-project', filePath];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'c': {
-        filePath = path.join(tmpDir, `${id}.c`);
-        const outC = path.join(tmpDir, `${id}_c.out`);
-        await fs.promises.writeFile(filePath, code);
-        // Compile then run
-        const compileC = await runProc(['gcc', filePath, '-o', outC, '-lm'], tmpDir, '');
-        if (compileC.stderr && !compileC.stdout) {
-          return res.json({ output: `[Compile Error]\n${compileC.stderr}`, error: true });
-        }
-        cmd = [outC];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'cpp': {
-        filePath = path.join(tmpDir, `${id}.cpp`);
-        const outCpp = path.join(tmpDir, `${id}_cpp.out`);
-        await fs.promises.writeFile(filePath, code);
-        const compileCpp = await runProc(['g++', filePath, '-o', outCpp, '-std=c++17'], tmpDir, '');
-        if (compileCpp.stderr && !compileCpp.stdout) {
-          return res.json({ output: `[Compile Error]\n${compileCpp.stderr}`, error: true });
-        }
-        cmd = [outCpp];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'java': {
-        const javaDir = path.join(tmpDir, id);
-        await fs.promises.mkdir(javaDir, { recursive: true });
-        filePath = path.join(javaDir, 'Main.java');
-        await fs.promises.writeFile(filePath, code);
-        const compileJava = await runProc(['javac', 'Main.java'], javaDir, '');
-        if (compileJava.stderr && compileJava.exitCode !== 0) {
-          return res.json({ output: `[Compile Error]\n${compileJava.stderr}`, error: true });
-        }
-        cmd = ['java', '-cp', javaDir, 'Main'];
-        cwd = javaDir;
-        break;
-      }
-
-      case 'csharp': {
-        filePath = path.join(tmpDir, `${id}.cs`);
-        const outCs = path.join(tmpDir, `${id}.exe`);
-        await fs.promises.writeFile(filePath, code);
-        const compileCs = await runProc(['mcs', filePath, `-out:${outCs}`], tmpDir, '');
-        if (compileCs.stderr && compileCs.exitCode !== 0) {
-          return res.json({ output: `[Compile Error]\n${compileCs.stderr}`, error: true });
-        }
-        cmd = ['mono', outCs];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'go': {
-        filePath = path.join(tmpDir, `${id}.go`);
-        await fs.promises.writeFile(filePath, code);
-        cmd = ['go', 'run', filePath];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'ruby': {
-        filePath = path.join(tmpDir, `${id}.rb`);
-        await fs.promises.writeFile(filePath, code);
-        cmd = ['ruby', filePath];
-        cwd = tmpDir;
-        break;
-      }
-
-      case 'php': {
-        filePath = path.join(tmpDir, `${id}.php`);
-        await fs.promises.writeFile(filePath, code);
-        cmd = ['php', filePath];
-        cwd = tmpDir;
-        break;
-      }
-
-      default:
-        return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
+    if (!pistonRes.ok) {
+      const errText = await pistonRes.text();
+      return res.status(502).json({ output: `Piston API error: ${errText}`, error: true });
     }
 
-    // Run the program
-    const result = await runProc(cmd, cwd, stdin || '');
+    const data = await pistonRes.json();
 
-    let output = result.stdout || '';
-    if (result.stderr) output += (output ? '\n' : '') + `[stderr]\n${result.stderr}`;
-    if (!output.trim()) output = '(No output)';
+    // Piston returns: { compile: { stdout, stderr, code }, run: { stdout, stderr, code } }
+    let output = '';
 
-    res.json({ output: output.trim(), error: result.exitCode !== 0 });
+    // Show compile errors/warnings if present
+    if (data.compile) {
+      if (data.compile.stderr && data.compile.stderr.trim()) {
+        output += `[Compile]\n${data.compile.stderr.trim()}\n`;
+      }
+      if (data.compile.stdout && data.compile.stdout.trim()) {
+        output += data.compile.stdout.trim() + '\n';
+      }
+      // If compile failed (non-zero exit), stop here
+      if (data.compile.code !== 0) {
+        return res.json({ output: output.trim() || '[Compilation failed with no output]', error: true });
+      }
+    }
+
+    // Run output
+    if (data.run) {
+      if (data.run.stdout && data.run.stdout.trim()) output += data.run.stdout.trim();
+      if (data.run.stderr && data.run.stderr.trim()) {
+        output += (output ? '\n' : '') + `[stderr]\n${data.run.stderr.trim()}`;
+      }
+      if (!output.trim()) output = '(No output)';
+
+      const hasError = data.run.code !== 0;
+      return res.json({ output: output.trim(), error: hasError });
+    }
+
+    res.json({ output: output.trim() || '(No output)', error: false });
 
   } catch (err) {
     res.status(500).json({ output: 'Execution failed: ' + err.message, error: true });
   }
 });
-
-// Helper: run a process and collect output
-function runProc(cmd, cwd, stdin) {
-  return new Promise((resolve) => {
-    const proc = spawn(cmd[0], cmd.slice(1), {
-      cwd,
-      timeout: 15000,
-      env: { ...process.env, JAVA_TOOL_OPTIONS: '-Xmx256m' }
-    });
-
-    if (stdin) proc.stdin.write(stdin);
-    proc.stdin.end();
-
-    let stdout = '', stderr = '';
-    proc.stdout.on('data', d => { stdout += d.toString(); });
-    proc.stderr.on('data', d => { stderr += d.toString(); });
-    proc.on('close', exitCode => resolve({ stdout, stderr, exitCode }));
-    proc.on('error', err => resolve({ stdout: '', stderr: err.message, exitCode: 1 }));
-  });
-}
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
