@@ -6,9 +6,9 @@ const os = require('os');
 const pty = require('node-pty');
 const WebSocket = require('ws');
 const { setupWSConnection } = require('y-websocket/bin/utils');
-// Code execution now uses Piston API (free, no API key needed)
-// https://github.com/engineer-man/piston
-const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
+
+// Execution API (Wandbox - Reliable and Free)
+const WANDBOX_URL = 'https://wandbox.org/api/compile.json';
 
 const app = express();
 app.use(cors());
@@ -319,110 +319,88 @@ function generatedCode() {
   res.json({ code: mockCode });
 });
 
-// ─── Language map: our language name → Piston runtime name + version ───────
-const PISTON_LANG_MAP = {
-  python:     { language: 'python',     version: '3.10.0' },
-  jupyter:    { language: 'python',     version: '3.10.0' },
-  javascript: { language: 'javascript', version: '18.15.0' },
-  typescript: { language: 'typescript', version: '5.0.3' },
-  c:          { language: 'c',          version: '10.2.0' },
-  cpp:        { language: 'c++',        version: '10.2.0' },
-  java:       { language: 'java',       version: '15.0.2' },
-  csharp:     { language: 'csharp',     version: '6.12.0' },
-  go:         { language: 'go',         version: '1.16.2' },
-  ruby:       { language: 'ruby',       version: '3.0.1' },
-  php:        { language: 'php',        version: '8.2.3' },
-  rust:       { language: 'rust',       version: '1.50.0' },
-  kotlin:     { language: 'kotlin',     version: '1.8.20' },
-  swift:      { language: 'swift',      version: '5.3.3' },
-  bash:       { language: 'bash',       version: '5.2.0' },
+// ─── Language map: our language name → Wandbox compiler names ───────
+const WANDBOX_COMPILER_MAP = {
+  python:     'cpython-head',
+  jupyter:    'cpython-head',
+  javascript: 'nodejs-head',
+  typescript: 'typescript-head',
+  c:          'gcc-head-c',
+  cpp:        'gcc-head',
+  java:       'openjdk-head',
+  go:         'go-head',
+  ruby:       'ruby-head',
+  php:        'php-head',
+  rust:       'rust-head',
+  bash:       'bash',
 };
 
-// File extension map for Piston
-const LANG_EXT = {
-  python: 'py', jupyter: 'py', javascript: 'js', typescript: 'ts',
-  c: 'c', cpp: 'cpp', java: 'java', csharp: 'cs',
-  go: 'go', ruby: 'rb', php: 'php', rust: 'rs',
-  kotlin: 'kt', swift: 'swift', bash: 'sh',
-};
-
-// Code Execution Endpoint — powered by Piston API (free, no Docker needed)
+// Code Execution Endpoint — powered by Wandbox API
 app.post('/api/execute', async (req, res) => {
   const { language, code, stdin } = req.body;
   if (!code) return res.status(400).json({ error: 'No code provided' });
 
-  if (['html', 'css'].includes(language)) {
-    return res.status(400).json({ error: 'Web languages are rendered in the browser.' });
-  }
-  if (language === 'sql') {
-    return res.json({ output: 'SQL execution is not supported in the sandbox.', error: false });
-  }
-
-  const pistonLang = PISTON_LANG_MAP[language];
-  if (!pistonLang) {
+  const compiler = WANDBOX_COMPILER_MAP[language];
+  if (!compiler) {
     return res.status(400).json({ output: `Language "${language}" is not supported.`, error: true });
   }
 
-  const ext = LANG_EXT[language] || 'txt';
-  // Java requires the file to be named Main.java
-  const filename = language === 'java' ? 'Main.java' : `code.${ext}`;
-
   try {
-    const pistonRes = await fetch(PISTON_URL, {
+    const response = await fetch(WANDBOX_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        language: pistonLang.language,
-        version: pistonLang.version,
-        files: [{ name: filename, content: code }],
+        compiler: compiler,
+        code: code,
         stdin: stdin || '',
-        run_timeout: 10000,   // 10 second max run time
-        compile_timeout: 15000
+        save: false,
       })
     });
 
-    if (!pistonRes.ok) {
-      const errText = await pistonRes.text();
-      return res.status(502).json({ output: `Piston API error: ${errText}`, error: true });
-    }
+    if (!response.ok) throw new Error(`Wandbox status: ${response.status}`);
+    const data = await response.json();
 
-    const data = await pistonRes.json();
-
-    // Piston returns: { compile: { stdout, stderr, code }, run: { stdout, stderr, code } }
+    // Wandbox returns program_output, program_error, etc.
     let output = '';
+    if (data.compiler_error) output += `[Compiler Error]\n${data.compiler_error}\n`;
+    if (data.program_output) output += data.program_output;
+    if (data.program_error) output += (output ? '\n' : '') + data.program_error;
+    
+    if (!output.trim()) output = data.status === "0" ? "(No output)" : `(Exit status: ${data.status})`;
 
-    // Show compile errors/warnings if present
-    if (data.compile) {
-      if (data.compile.stderr && data.compile.stderr.trim()) {
-        output += `[Compile]\n${data.compile.stderr.trim()}\n`;
-      }
-      if (data.compile.stdout && data.compile.stdout.trim()) {
-        output += data.compile.stdout.trim() + '\n';
-      }
-      // If compile failed (non-zero exit), stop here
-      if (data.compile.code !== 0) {
-        return res.json({ output: output.trim() || '[Compilation failed with no output]', error: true });
-      }
-    }
-
-    // Run output
-    if (data.run) {
-      if (data.run.stdout && data.run.stdout.trim()) output += data.run.stdout.trim();
-      if (data.run.stderr && data.run.stderr.trim()) {
-        output += (output ? '\n' : '') + `[stderr]\n${data.run.stderr.trim()}`;
-      }
-      if (!output.trim()) output = '(No output)';
-
-      const hasError = data.run.code !== 0;
-      return res.json({ output: output.trim(), error: hasError });
-    }
-
-    res.json({ output: output.trim() || '(No output)', error: false });
+    res.json({ output: output.trim(), error: data.status !== "0" });
 
   } catch (err) {
-    res.status(500).json({ output: 'Execution failed: ' + err.message, error: true });
+    console.error("Wandbox failed:", err.message);
+    res.status(500).json({ output: 'Execution service error. Please try again.', error: true });
   }
 });
+
+async function tryPiston(pistonLang, filename, code, stdin) {
+  const response = await fetch(PISTON_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      language: pistonLang.language,
+      version: pistonLang.version,
+      files: [{ name: filename, content: code }],
+      stdin: stdin || '',
+      run_timeout: 10000
+    })
+  });
+
+  if (!response.ok) throw new Error(`Piston status: ${response.status}`);
+  const data = await response.json();
+
+  let output = '';
+  if (data.compile && data.compile.stderr) output += `[Compile Error]\n${data.compile.stderr}\n`;
+  if (data.run) {
+    output += (data.run.stdout || '') + (data.run.stderr || '');
+    if (!output.trim()) output = data.run.code === 0 ? '(No output)' : `(Process exited with code ${data.run.code})`;
+    return { output: output.trim(), error: data.run.code !== 0 };
+  }
+  return { output: output.trim() || 'No response from runner', error: true };
+}
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
