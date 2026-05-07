@@ -321,17 +321,17 @@ function generatedCode() {
 
 // ─── Language map: our language name → Wandbox compiler names ───────
 const WANDBOX_COMPILER_MAP = {
-  python:     'cpython-head',
-  jupyter:    'cpython-head',
-  javascript: 'nodejs-head',
-  typescript: 'typescript-head',
-  c:          'gcc-head-c',
-  cpp:        'gcc-head',
-  java:       'openjdk-head',
-  go:         'go-head',
-  ruby:       'ruby-head',
-  php:        'php-head',
-  rust:       'rust-head',
+  python:     'cpython-3.14.0',
+  jupyter:    'cpython-3.14.0',
+  javascript: 'nodejs-20.17.0',
+  typescript: 'typescript-head', // Typescript usually only has head on Wandbox
+  c:          'gcc-14.2.0-c',
+  cpp:        'gcc-14.2.0',
+  java:       'openjdk-jdk-22+36',
+  go:         'go-1.23.2',
+  ruby:       'ruby-4.0.2',
+  php:        'php-8.3.12',
+  rust:       'rust-1.82.0',
   bash:       'bash',
 };
 
