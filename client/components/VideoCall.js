@@ -90,7 +90,7 @@ export default function VideoCall({ socket, roomId, username, users }) {
         delete peersRef.current[userId];
       }
       setStreams(prev => prev.filter(s => s.id !== userId));
-      const audioEl = document.getElementById(`audio-${userId}`);
+      const audioEl = document.getElementById(`audio-out-${userId}`);
       if (audioEl) audioEl.remove();
     };
 
@@ -149,6 +149,26 @@ export default function VideoCall({ socket, roomId, username, users }) {
     }
   };
 
+  useEffect(() => {
+    // Sync remote streams to audio elements (the highly reliable "old" way)
+    const remoteStreams = streams.filter(s => !s.isLocal);
+    
+    remoteStreams.forEach(s => {
+      let audio = document.getElementById(`audio-out-${s.id}`);
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = `audio-out-${s.id}`;
+        audio.autoplay = true;
+        document.body.appendChild(audio);
+      }
+      if (audio.srcObject !== s.stream) {
+        audio.srcObject = s.stream;
+      }
+    });
+
+    return () => {};
+  }, [streams]);
+
   const startCall = async (type) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -191,8 +211,8 @@ export default function VideoCall({ socket, roomId, username, users }) {
     });
     peersRef.current = {};
     setStreams([]);
-    document.querySelectorAll('audio[id^="audio-"]').forEach(el => el.remove());
-    socket.emit('user-left', socket.id); // Notify others via server
+    document.querySelectorAll('audio[id^="audio-out-"]').forEach(el => el.remove());
+    socket.emit('user-left', socket.id); 
   };
 
   const toggleMute = () => {
@@ -323,46 +343,14 @@ export default function VideoCall({ socket, roomId, username, users }) {
 
 function MediaRenderer({ stream, isLocal, name, type, isPinned, onPin }) {
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
 
   useEffect(() => {
     if (type === 'video' && videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-    } else if (type === 'audio' && audioRef.current && stream && !isLocal) {
-      audioRef.current.srcObject = stream;
     }
-  }, [stream, type, isLocal]);
+  }, [stream, type]);
 
-  if (type === 'audio') {
-    return (
-      <div 
-        onClick={onPin}
-        style={{ 
-          width: isPinned ? '280px' : '180px', height: isPinned ? '80px' : '60px', 
-          background: isPinned ? 'rgba(99, 102, 241, 0.2)' : 'rgba(30, 41, 59, 0.8)', 
-          borderRadius: '12px', display: 'flex', alignItems: 'center', padding: '0 1rem', 
-          gap: '0.75rem', border: isPinned ? '2px solid #6366f1' : '1px solid #475569', 
-          backdropFilter: 'blur(10px)', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
-          cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}
-      >
-        {!isLocal && <audio ref={audioRef} autoPlay />}
-        <div style={{ 
-          width: isPinned ? '40px' : '32px', height: isPinned ? '40px' : '32px', 
-          borderRadius: '50%', background: '#6366f1', 
-          display: 'flex', alignItems: 'center', justifyContent: 'center', 
-          fontSize: isPinned ? '1rem' : '0.8rem', fontWeight: 700, color: '#fff' 
-        }}>
-          {name.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <div style={{ fontSize: isPinned ? '0.85rem' : '0.75rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
-          <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>Voice active</div>
-        </div>
-        <Headphones size={isPinned ? 18 : 14} color="#6366f1" />
-      </div>
-    );
-  }
+  if (type === 'audio') return null;
 
   return (
     <div 
