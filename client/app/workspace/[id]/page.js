@@ -28,7 +28,7 @@ export default function WorkspacePage({ params }) {
   const [activeTab, setActiveTab] = useState('editor');
   const [copied, setCopied] = useState(false);
   const [isHost, setIsHost] = useState(false);
-  const [joinStatus, setJoinStatus] = useState('waiting'); // starts as waiting, server sends 'join-approved' or 'join-pending'→'waiting'→'declined'
+  const [joinStatus, setJoinStatus] = useState(searchParams && searchParams.get('host') === 'true' ? 'approved' : 'waiting'); // starts as waiting, server sends 'join-approved' or 'join-pending'→'waiting'→'declined'
   const [joinRequests, setJoinRequests] = useState([]);
   const [shareToasts, setShareToasts] = useState([]); // [{id, sharer, type:'share'|'join'}]
   const [recentlyJoined, setRecentlyJoined] = useState(new Set()); // socket IDs that just joined

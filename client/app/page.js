@@ -65,7 +65,7 @@ export default function HomeDashboard() {
   const handleCreate = () => {
     if (!username.trim()) return;
     const id = Math.random().toString(36).substring(2, 9);
-    router.push(`/workspace/${id}?username=${encodeURIComponent(username)}`);
+    router.push(`/workspace/${id}?username=${encodeURIComponent(username)}&host=true`);
   };
 
   const handleJoin = (e) => {
