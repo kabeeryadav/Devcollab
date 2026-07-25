@@ -159,17 +159,18 @@ export default function HomeDashboard() {
   }
 
   // Theme variable colors
+  // Theme variable colors - Immersive Cyberpunk & Neon Matrix Palette
   const colors = {
-    bg: isDark ? '#070a13' : '#f8fafc',
-    cardBg: isDark ? 'rgba(17, 24, 39, 0.7)' : 'rgba(255, 255, 255, 0.85)',
-    cardBorder: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-    textPrimary: isDark ? '#f8fafc' : '#0f172a',
-    textSecondary: isDark ? '#94a3b8' : '#64748b',
+    bg: isDark ? '#02040a' : '#f8fafc',
+    cardBg: isDark ? 'rgba(13, 18, 36, 0.75)' : 'rgba(255, 255, 255, 0.85)',
+    cardBorder: isDark ? 'rgba(0, 240, 255, 0.22)' : 'rgba(0, 0, 0, 0.08)',
+    textPrimary: isDark ? '#ffffff' : '#0f172a',
+    textSecondary: isDark ? '#a5b4fc' : '#64748b',
     textMuted: isDark ? '#64748b' : '#94a3b8',
-    inputBg: isDark ? 'rgba(15, 23, 42, 0.8)' : '#ffffff',
-    inputBorder: isDark ? 'rgba(255, 255, 255, 0.12)' : '#cbd5e1',
-    glowPrimary: isDark ? 'rgba(99, 102, 241, 0.25)' : 'rgba(59, 130, 246, 0.15)',
-    navBg: isDark ? 'rgba(7, 10, 19, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+    inputBg: isDark ? 'rgba(6, 10, 22, 0.9)' : '#ffffff',
+    inputBorder: isDark ? 'rgba(0, 240, 255, 0.3)' : '#cbd5e1',
+    glowPrimary: isDark ? 'rgba(0, 240, 255, 0.4)' : 'rgba(59, 130, 246, 0.15)',
+    navBg: isDark ? 'rgba(2, 4, 10, 0.85)' : 'rgba(255, 255, 255, 0.85)',
   };
 
   return (
@@ -182,12 +183,22 @@ export default function HomeDashboard() {
       overflowX: 'hidden',
       transition: 'background-color 0.4s ease, color 0.4s ease',
     }}>
-      {/* ── AMBIENT COSMIC BACKGROUND LIGHTING ── */}
+      {/* ── AMBIENT CYBERPUNK MATRIX & PARTICLE BACKGROUND ── */}
       <div className="ambient-background">
+        <div className="plasma-beam beam-1" />
+        <div className="plasma-beam beam-2" />
+        <div className="plasma-beam beam-3" />
         <div className="glow-sphere sphere-1" />
         <div className="glow-sphere sphere-2" />
         <div className="glow-sphere sphere-3" />
-        <div className="grid-overlay" />
+        <div className="cyber-grid" />
+        <div className="scanline" />
+        {/* Floating animated neon particles */}
+        <div className="particles-container">
+          {[...Array(20)].map((_, i) => (
+            <div key={i} className={`cyber-particle particle-${i + 1}`} />
+          ))}
+        </div>
       </div>
 
       {/* ── TOP NAV BAR ── */}
@@ -987,33 +998,86 @@ export default function HomeDashboard() {
           pointer-events: none;
           z-index: 1;
           overflow: hidden;
+          background: ${isDark ? 'radial-gradient(circle at 50% 30%, #081028 0%, #02040a 85%)' : 'none'};
+        }
+        .plasma-beam {
+          position: absolute;
+          width: 200vw;
+          height: 140px;
+          opacity: ${isDark ? '0.18' : '0.05'};
+          filter: blur(60px);
+          transform: rotate(-25deg);
+          animation: pulseGlow 8s infinite alternate ease-in-out;
+        }
+        .beam-1 { top: 10%; left: -50%; background: linear-gradient(90deg, transparent, #00f0ff, #8a2be2, transparent); }
+        .beam-2 { top: 50%; left: -30%; background: linear-gradient(90deg, transparent, #ff007f, #00f0ff, transparent); animation-delay: -3s; }
+        .beam-3 { bottom: 10%; left: -40%; background: linear-gradient(90deg, transparent, #7b2cbf, #4361ee, transparent); animation-delay: -5s; }
+        @keyframes pulseGlow {
+          0% { transform: rotate(-25deg) translateY(-30px); opacity: 0.12; }
+          100% { transform: rotate(-23deg) translateY(30px); opacity: 0.28; }
         }
         .glow-sphere {
           position: absolute;
           border-radius: 50%;
-          filter: blur(100px);
-          opacity: ${isDark ? '0.22' : '0.12'};
+          filter: blur(130px);
+          opacity: ${isDark ? '0.3' : '0.12'};
           transition: all 1s ease;
         }
-        .sphere-1 {
-          top: -10%; left: 15%; width: 500px; height: 500px;
-          background: #6366f1;
-        }
-        .sphere-2 {
-          top: 40%; right: -5%; width: 600px; height: 600px;
-          background: #3b82f6;
-        }
-        .sphere-3 {
-          bottom: -10%; left: 30%; width: 450px; height: 450px;
-          background: #06b6d4;
-        }
-        .grid-overlay {
+        .sphere-1 { top: -10%; left: 15%; width: 550px; height: 550px; background: #00f0ff; }
+        .sphere-2 { top: 40%; right: -5%; width: 650px; height: 650px; background: #8a2be2; }
+        .sphere-3 { bottom: -10%; left: 30%; width: 500px; height: 500px; background: #ff007f; }
+        .cyber-grid {
           position: absolute;
           inset: 0;
-          background-image: radial-gradient(${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} 1px, transparent 1px);
-          background-size: 32px 32px;
-          mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
-          -webkit-mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+          background-image: 
+            linear-gradient(to right, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px),
+            linear-gradient(to bottom, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px);
+          background-size: 36px 36px;
+          mask-image: radial-gradient(ellipse at 50% 50%, black 25%, transparent 85%);
+          -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 25%, transparent 85%);
+          animation: gridMove 20s linear infinite;
+        }
+        @keyframes gridMove {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(36px); }
+        }
+        .scanline {
+          position: absolute;
+          top: 0; left: 0; right: 0; height: 2px;
+          background: linear-gradient(to right, transparent, rgba(0, 240, 255, 0.6), transparent);
+          opacity: ${isDark ? '0.7' : '0.2'};
+          animation: scan 5s linear infinite;
+        }
+        @keyframes scan {
+          0% { top: -5%; }
+          100% { top: 105%; }
+        }
+        .particles-container {
+          position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+        }
+        .cyber-particle {
+          position: absolute;
+          width: 3px; height: 3px;
+          border-radius: 50%;
+          animation: floatUp 12s linear infinite;
+          opacity: 0;
+        }
+        ${[...Array(20)].map((_, i) => `
+          .particle-${i + 1} {
+            left: ${Math.floor((i * 17) % 95)}%;
+            bottom: -10%;
+            animation-duration: ${7 + (i % 6)}s;
+            animation-delay: ${-(i * 1.1)}s;
+            background: ${i % 3 === 0 ? '#ff007f' : (i % 2 === 0 ? '#8a2be2' : '#00f0ff')};
+            box-shadow: 0 0 10px ${i % 3 === 0 ? '#ff007f' : (i % 2 === 0 ? '#8a2be2' : '#00f0ff')};
+            transform: scale(${0.7 + ((i % 5) * 0.3)});
+          }
+        `).join('')}
+        @keyframes floatUp {
+          0% { transform: translateY(0) scale(0.8); opacity: 0; }
+          20% { opacity: 0.85; }
+          80% { opacity: 0.85; }
+          100% { transform: translateY(-105vh) scale(1.3); opacity: 0; }
         }
         .hover-scale:hover {
           transform: scale(1.08);
