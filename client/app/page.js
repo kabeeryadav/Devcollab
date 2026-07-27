@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Code2, Terminal, Users, Zap, Sparkles, Play, ArrowRight, Share2, 
   Layers, Cpu, MessageSquare, Video, Shield, GitBranch, CheckCircle2, 
@@ -227,6 +228,31 @@ export default function HomeDashboard() {
         </div>
       </div>
 
+      {/* ── TOP PROPRIETARY ANNOUNCEMENT BANNER ── */}
+      <div style={{
+        background: isDark ? 'linear-gradient(90deg, rgba(239, 68, 68, 0.15), rgba(99, 102, 241, 0.15))' : 'linear-gradient(90deg, rgba(239, 68, 68, 0.1), rgba(99, 102, 241, 0.1))',
+        borderBottom: `1px solid ${isDark ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.2)'}`,
+        padding: '0.45rem 2rem',
+        textAlign: 'center',
+        fontSize: '0.78rem',
+        fontWeight: 600,
+        color: colors.textPrimary,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.8rem',
+        flexWrap: 'wrap'
+      }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#ef4444', fontWeight: 700 }}>
+          <Shield size={14} />
+          <span>PROPRIETARY COMMERCIAL ASSET (NOT OPEN SOURCE)</span>
+        </span>
+        <span style={{ color: colors.textMuted }}>•</span>
+        <span>Project name <strong>&quot;Devcollab&quot;</strong> is a temporary working code-name.</span>
+        <span style={{ color: colors.textMuted }}>•</span>
+        <div style={{ display: 'flex', gap: '0.8rem' }}>
+          <Link href="/privacy" style={{ color: '#6366f1', textDecoration: 'underline', fontWeight: 700 }}>Privacy Policy</Link>
+          <Link href="/terms" style={{ color: '#6366f1', textDecoration: 'underline', fontWeight: 700 }}>Terms of Service</Link>
+        </div>
+      </div>
+
       {/* ── TOP NAV BAR ── */}
       <nav style={{
         padding: '0.85rem 3rem',
@@ -254,11 +280,12 @@ export default function HomeDashboard() {
             <div className="shimmer-effect" />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #6366f1, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>DevCollab</span>
-              <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>2.0 LIVE</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(to right, #6366f1, #38bdf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Devcollab</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>TEMP NAME</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' }}>PROPRIETARY</span>
             </div>
-            <span style={{ fontSize: '0.72rem', color: colors.textMuted, display: 'block', marginTop: '-2px' }}>Realtime Developer Workspace</span>
+            <span style={{ fontSize: '0.72rem', color: colors.textMuted, display: 'block', marginTop: '-2px' }}>Realtime Developer Workspace (Not Open Source)</span>
           </div>
         </div>
 
@@ -972,17 +999,17 @@ export default function HomeDashboard() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         fontSize: '0.85rem', color: colors.textMuted
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <div style={{ width: '24px', height: '24px', background: 'linear-gradient(135deg, #6366f1, #3b82f6)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
             <Code2 size={14} />
           </div>
-          <span style={{ fontWeight: 700, color: colors.textPrimary }}>DevCollab</span>
-          <span>© {new Date().getFullYear()} Advanced Realtime IDE. All rights reserved.</span>
+          <span style={{ fontWeight: 700, color: colors.textPrimary }}>Devcollab <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '0.15rem 0.5rem', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.25)', marginLeft: '0.3rem' }}>Temp Name / Not Open Source</span></span>
+          <span style={{ marginLeft: '0.5rem' }}>© {new Date().getFullYear()} Strictly Proprietary Commercial IP. All rights reserved.</span>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem', fontWeight: 500 }}>
-          <a href="#privacy" style={{ color: colors.textMuted, textDecoration: 'none' }}>Privacy</a>
-          <a href="#terms" style={{ color: colors.textMuted, textDecoration: 'none' }}>Terms</a>
-          <a href="#docs" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600 }}>Documentation →</a>
+          <Link href="/privacy" style={{ color: colors.textMuted, textDecoration: 'none', transition: 'color 0.2s' }}>Privacy</Link>
+          <Link href="/terms" style={{ color: colors.textMuted, textDecoration: 'none', transition: 'color 0.2s' }}>Terms</Link>
+          <a href="#features" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600 }}>Documentation →</a>
         </div>
       </footer>
 
