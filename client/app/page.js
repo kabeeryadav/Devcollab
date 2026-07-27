@@ -88,7 +88,6 @@ export default function HomeDashboard() {
   // Animation states for code typing
   const [visibleCodeLines, setVisibleCodeLines] = useState(0);
   const [charCount, setCharCount] = useState(0);
-  const [activeUsersCount, setActiveUsersCount] = useState(1428);
   const router = useRouter();
 
   useEffect(() => {
@@ -97,12 +96,6 @@ export default function HomeDashboard() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setIsDark(savedTheme === 'dark');
     document.documentElement.setAttribute('data-theme', savedTheme);
-
-    // Simulate online developers count slight fluctuation
-    const interval = setInterval(() => {
-      setActiveUsersCount(prev => prev + Math.floor(Math.random() * 5) - 2);
-    }, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   const toggleTheme = () => {
@@ -135,23 +128,37 @@ export default function HomeDashboard() {
     return () => clearInterval(timer);
   }, [visibleCodeLines, mockupTab]);
 
+  const navigateToWorkspace = (url) => {
+    try {
+      router.push(url);
+    } catch (e) {
+      window.location.href = url;
+    }
+    setTimeout(() => {
+      if (window.location.pathname === '/') {
+        window.location.href = url;
+      }
+    }, 150);
+  };
+
   const handleCreate = (e) => {
     if (e) e.preventDefault();
     if (!username.trim()) return;
     const id = Math.random().toString(36).substring(2, 9);
-    router.push(`/workspace/${id}?username=${encodeURIComponent(username)}&host=true&template=${selectedTemplate}`);
+    navigateToWorkspace(`/workspace/${id}?username=${encodeURIComponent(username)}&host=true&template=${selectedTemplate}`);
   };
 
   const handleJoin = (e) => {
     if (e) e.preventDefault();
     if (!username.trim() || !roomId.trim()) return;
-    router.push(`/workspace/${roomId}?username=${encodeURIComponent(username)}`);
+    navigateToWorkspace(`/workspace/${roomId}?username=${encodeURIComponent(username)}`);
   };
 
-  const handleQuickDemo = () => {
+  const handleQuickDemo = (e) => {
+    if (e) e.preventDefault();
     const randomId = 'demo-' + Math.random().toString(36).substring(2, 7);
     const demoUser = username.trim() ? username : 'Demo Developer';
-    router.push(`/workspace/${randomId}?username=${encodeURIComponent(demoUser)}&host=true&template=web`);
+    navigateToWorkspace(`/workspace/${randomId}?username=${encodeURIComponent(demoUser)}&host=true&template=web`);
   };
 
   if (!mounted) {
@@ -257,18 +264,6 @@ export default function HomeDashboard() {
 
         {/* Right Nav Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-          {/* Live Online Users Badge */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            padding: '0.4rem 0.85rem', borderRadius: '30px',
-            background: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
-            border: `1px solid ${colors.cardBorder}`,
-            fontSize: '0.8rem', fontWeight: 500, color: colors.textSecondary
-          }}>
-            <span className="pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-            <span><strong style={{ color: colors.textPrimary }}>{activeUsersCount.toLocaleString()}</strong> devs coding now</span>
-          </div>
-
           {/* Theme Toggle Button */}
           <button 
             onClick={toggleTheme}
@@ -386,12 +381,12 @@ export default function HomeDashboard() {
                 style={{
                   padding: '0.65rem 1rem', borderRadius: '9px',
                   border: 'none',
-                  background: activeFormTab === 'create' ? (isDark ? '#3b82f6' : '#fff') : 'transparent',
-                  color: activeFormTab === 'create' ? '#fff' : colors.textSecondary,
+                  background: activeFormTab === 'create' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'transparent',
+                  color: activeFormTab === 'create' ? '#ffffff' : colors.textSecondary,
                   fontWeight: activeFormTab === 'create' ? 700 : 500,
                   fontSize: '0.85rem', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                  boxShadow: activeFormTab === 'create' && !isDark ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: activeFormTab === 'create' ? '0 4px 12px rgba(59, 130, 246, 0.35)' : 'none',
                   transition: 'all 0.2s ease'
                 }}
               >
@@ -404,12 +399,12 @@ export default function HomeDashboard() {
                 style={{
                   padding: '0.65rem 1rem', borderRadius: '9px',
                   border: 'none',
-                  background: activeFormTab === 'join' ? (isDark ? '#6366f1' : '#fff') : 'transparent',
-                  color: activeFormTab === 'join' ? '#fff' : colors.textSecondary,
+                  background: activeFormTab === 'join' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+                  color: activeFormTab === 'join' ? '#ffffff' : colors.textSecondary,
                   fontWeight: activeFormTab === 'join' ? 700 : 500,
                   fontSize: '0.85rem', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                  boxShadow: activeFormTab === 'join' && !isDark ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: activeFormTab === 'join' ? '0 4px 12px rgba(99, 102, 241, 0.35)' : 'none',
                   transition: 'all 0.2s ease'
                 }}
               >

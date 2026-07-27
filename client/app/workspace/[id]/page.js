@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, use } from 'react';
 import { io } from 'socket.io-client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -15,7 +15,8 @@ const Settings = dynamic(() => import('@/components/Settings'), { ssr: false });
 import { Code, LayoutDashboard, CheckSquare, Settings as SettingsIcon, Monitor, LogOut, Copy, Check, Sun, Moon, PanelLeftClose, PanelLeftOpen, Crown, X, UserMinus, ShieldCheck, Users } from 'lucide-react';
 
 export default function WorkspacePage({ params }) {
-  const roomId = params.id;
+  const unwrappedParams = typeof params?.then === 'function' ? use(params) : params;
+  const roomId = unwrappedParams?.id || '';
   const searchParams = useSearchParams();
   const [localUsername, setLocalUsername] = useState('');
   useEffect(() => {
