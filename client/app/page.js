@@ -184,20 +184,39 @@ export default function HomeDashboard() {
       transition: 'background-color 0.4s ease, color 0.4s ease',
     }}>
       {/* ── AMBIENT CYBERPUNK MATRIX & PARTICLE BACKGROUND ── */}
-      <div className="ambient-background">
-        <div className="plasma-beam beam-1" />
-        <div className="plasma-beam beam-2" />
-        <div className="plasma-beam beam-3" />
-        <div className="glow-sphere sphere-1" />
-        <div className="glow-sphere sphere-2" />
-        <div className="glow-sphere sphere-3" />
-        <div className="cyber-grid" />
-        <div className="scanline" />
+      <div className="ambient-background" style={{
+        background: isDark ? 'radial-gradient(circle at 50% 30%, #081028 0%, #02040a 85%)' : 'none'
+      }}>
+        <div className="plasma-beam beam-1" style={{ opacity: isDark ? 0.18 : 0.05 }} />
+        <div className="plasma-beam beam-2" style={{ opacity: isDark ? 0.18 : 0.05 }} />
+        <div className="plasma-beam beam-3" style={{ opacity: isDark ? 0.18 : 0.05 }} />
+        <div className="glow-sphere sphere-1" style={{ opacity: isDark ? 0.3 : 0.12 }} />
+        <div className="glow-sphere sphere-2" style={{ opacity: isDark ? 0.3 : 0.12 }} />
+        <div className="glow-sphere sphere-3" style={{ opacity: isDark ? 0.3 : 0.12 }} />
+        <div className="cyber-grid" style={{
+          backgroundImage: `linear-gradient(to right, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px), linear-gradient(to bottom, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px)`
+        }} />
+        <div className="scanline" style={{ opacity: isDark ? 0.7 : 0.2 }} />
         {/* Floating animated neon particles */}
         <div className="particles-container">
-          {[...Array(20)].map((_, i) => (
-            <div key={i} className={`cyber-particle particle-${i + 1}`} />
-          ))}
+          {[...Array(20)].map((_, i) => {
+            const color = i % 3 === 0 ? '#ff007f' : (i % 2 === 0 ? '#8a2be2' : '#00f0ff');
+            return (
+              <div
+                key={i}
+                className="cyber-particle"
+                style={{
+                  left: `${Math.floor((i * 17) % 95)}%`,
+                  bottom: '-10%',
+                  animationDuration: `${7 + (i % 6)}s`,
+                  animationDelay: `${-(i * 1.1)}s`,
+                  background: color,
+                  boxShadow: `0 0 10px ${color}`,
+                  transform: `scale(${0.7 + ((i % 5) * 0.3)})`,
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -998,13 +1017,11 @@ export default function HomeDashboard() {
           pointer-events: none;
           z-index: 1;
           overflow: hidden;
-          background: ${isDark ? 'radial-gradient(circle at 50% 30%, #081028 0%, #02040a 85%)' : 'none'};
         }
         .plasma-beam {
           position: absolute;
           width: 200vw;
           height: 140px;
-          opacity: ${isDark ? '0.18' : '0.05'};
           filter: blur(60px);
           transform: rotate(-25deg);
           animation: pulseGlow 8s infinite alternate ease-in-out;
@@ -1020,7 +1037,6 @@ export default function HomeDashboard() {
           position: absolute;
           border-radius: 50%;
           filter: blur(130px);
-          opacity: ${isDark ? '0.3' : '0.12'};
           transition: all 1s ease;
         }
         .sphere-1 { top: -10%; left: 15%; width: 550px; height: 550px; background: #00f0ff; }
@@ -1029,9 +1045,6 @@ export default function HomeDashboard() {
         .cyber-grid {
           position: absolute;
           inset: 0;
-          background-image: 
-            linear-gradient(to right, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px),
-            linear-gradient(to bottom, ${isDark ? 'rgba(0, 240, 255, 0.08)' : 'rgba(0,0,0,0.05)'} 1px, transparent 1px);
           background-size: 36px 36px;
           mask-image: radial-gradient(ellipse at 50% 50%, black 25%, transparent 85%);
           -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 25%, transparent 85%);
@@ -1045,7 +1058,6 @@ export default function HomeDashboard() {
           position: absolute;
           top: 0; left: 0; right: 0; height: 2px;
           background: linear-gradient(to right, transparent, rgba(0, 240, 255, 0.6), transparent);
-          opacity: ${isDark ? '0.7' : '0.2'};
           animation: scan 5s linear infinite;
         }
         @keyframes scan {
@@ -1062,17 +1074,6 @@ export default function HomeDashboard() {
           animation: floatUp 12s linear infinite;
           opacity: 0;
         }
-        ${[...Array(20)].map((_, i) => `
-          .particle-${i + 1} {
-            left: ${Math.floor((i * 17) % 95)}%;
-            bottom: -10%;
-            animation-duration: ${7 + (i % 6)}s;
-            animation-delay: ${-(i * 1.1)}s;
-            background: ${i % 3 === 0 ? '#ff007f' : (i % 2 === 0 ? '#8a2be2' : '#00f0ff')};
-            box-shadow: 0 0 10px ${i % 3 === 0 ? '#ff007f' : (i % 2 === 0 ? '#8a2be2' : '#00f0ff')};
-            transform: scale(${0.7 + ((i % 5) * 0.3)});
-          }
-        `).join('')}
         @keyframes floatUp {
           0% { transform: translateY(0) scale(0.8); opacity: 0; }
           20% { opacity: 0.85; }
