@@ -229,7 +229,7 @@ export default function HomeDashboard() {
 
       {/* ── TOP NAV BAR ── */}
       <nav style={{
-        padding: '1rem 3rem',
+        padding: '0.85rem 3rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -306,10 +306,10 @@ export default function HomeDashboard() {
       <div style={{
         maxWidth: '1380px',
         margin: '0 auto',
-        padding: '5rem 3rem 4rem',
+        padding: '2.2rem 3rem 3rem',
         display: 'grid',
         gridTemplateColumns: '1.05fr 1.35fr',
-        gap: '4.5rem',
+        gap: '3.5rem',
         alignItems: 'center',
         position: 'relative',
         zIndex: 10,
@@ -324,7 +324,7 @@ export default function HomeDashboard() {
             padding: '0.4rem 1rem', borderRadius: '30px',
             background: isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.1)',
             border: '1px solid rgba(99, 102, 241, 0.3)',
-            marginBottom: '1.8rem',
+            marginBottom: '1rem',
             boxShadow: '0 0 20px rgba(99, 102, 241, 0.15)'
           }}>
             <Sparkles size={14} color="#818cf8" />
@@ -334,11 +334,11 @@ export default function HomeDashboard() {
           </div>
 
           <h1 style={{
-            fontSize: 'clamp(2.6rem, 4.2vw, 3.8rem)',
+            fontSize: 'clamp(2.4rem, 3.8vw, 3.5rem)',
             fontWeight: 900,
             lineHeight: 1.1,
             letterSpacing: '-0.04em',
-            marginBottom: '1.5rem',
+            marginBottom: '1rem',
             color: colors.textPrimary,
           }}>
             Code together.<br />
@@ -347,10 +347,10 @@ export default function HomeDashboard() {
           </h1>
 
           <p style={{
-            fontSize: '1.1rem',
-            lineHeight: 1.7,
+            fontSize: '1.05rem',
+            lineHeight: 1.6,
             color: colors.textSecondary,
-            marginBottom: '2.5rem',
+            marginBottom: '1.5rem',
             maxWidth: '520px',
           }}>
             A frictionless shared workspace for engineering teams. Instant CRDT code editor, interactive system architecture whiteboard, WebRTC voice channels, and cloud compiler. Zero config.
@@ -361,7 +361,7 @@ export default function HomeDashboard() {
             background: colors.cardBg,
             border: `1px solid ${colors.cardBorder}`,
             borderRadius: '20px',
-            padding: '1.8rem',
+            padding: '1.35rem 1.5rem',
             boxShadow: isDark ? '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.08)' : '0 20px 50px rgba(0, 0, 0, 0.07)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -372,7 +372,7 @@ export default function HomeDashboard() {
               display: 'grid', gridTemplateColumns: '1fr 1fr',
               background: isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)',
               padding: '0.3rem', borderRadius: '12px',
-              marginBottom: '1.5rem',
+              marginBottom: '1rem',
               border: `1px solid ${colors.cardBorder}`
             }}>
               <button
@@ -416,8 +416,8 @@ export default function HomeDashboard() {
             {/* CREATE SESSION FORM */}
             {activeFormTab === 'create' ? (
               <form onSubmit={handleCreate}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+                <div style={{ marginBottom: '0.85rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>
                     Your Display Name
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -430,7 +430,7 @@ export default function HomeDashboard() {
                       onFocus={() => setFocusedInput('name')}
                       onBlur={() => setFocusedInput(null)}
                       style={{
-                        width: '100%', padding: '0.85rem 1rem 0.85rem 2.8rem',
+                        width: '100%', padding: '0.75rem 1rem 0.75rem 2.8rem',
                         background: colors.inputBg,
                         border: `1.5px solid ${focusedInput === 'name' ? '#6366f1' : colors.inputBorder}`,
                         borderRadius: '12px', color: colors.textPrimary,
@@ -443,11 +443,11 @@ export default function HomeDashboard() {
                 </div>
 
                 {/* Template Selector Grid */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.6rem' }}>
+                <div style={{ marginBottom: '1.1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.45rem' }}>
                     Choose Starter Template
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                     {STARTER_TEMPLATES.map((t) => {
                       const Icon = t.icon;
                       const isSelected = selectedTemplate === t.id;
@@ -456,7 +456,7 @@ export default function HomeDashboard() {
                           key={t.id}
                           onClick={() => setSelectedTemplate(t.id)}
                           style={{
-                            padding: '0.75rem',
+                            padding: '0.6rem 0.7rem',
                             borderRadius: '12px',
                             background: isSelected ? t.bg : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'),
                             border: `1.5px solid ${isSelected ? t.color : colors.cardBorder}`,
@@ -485,10 +485,10 @@ export default function HomeDashboard() {
                 <button
                   type="submit"
                   style={{
-                    width: '100%', padding: '0.95rem',
+                    width: '100%', padding: '0.85rem',
                     background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
                     border: 'none', borderRadius: '12px',
-                    color: '#fff', fontWeight: 700, fontSize: '1rem',
+                    color: '#fff', fontWeight: 700, fontSize: '0.95rem',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
                     boxShadow: '0 8px 25px rgba(99, 102, 241, 0.4)',
                     transition: 'all 0.2s ease',
@@ -502,8 +502,8 @@ export default function HomeDashboard() {
             ) : (
               /* JOIN ROOM FORM */
               <form onSubmit={handleJoin}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+                <div style={{ marginBottom: '0.85rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>
                     Your Display Name
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -516,7 +516,7 @@ export default function HomeDashboard() {
                       onFocus={() => setFocusedInput('join-name')}
                       onBlur={() => setFocusedInput(null)}
                       style={{
-                        width: '100%', padding: '0.85rem 1rem 0.85rem 2.8rem',
+                        width: '100%', padding: '0.75rem 1rem 0.75rem 2.8rem',
                         background: colors.inputBg,
                         border: `1.5px solid ${focusedInput === 'join-name' ? '#6366f1' : colors.inputBorder}`,
                         borderRadius: '12px', color: colors.textPrimary,
@@ -528,8 +528,8 @@ export default function HomeDashboard() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '1.8rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>
                     Room Invitation ID
                   </label>
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -542,7 +542,7 @@ export default function HomeDashboard() {
                       onFocus={() => setFocusedInput('room-id')}
                       onBlur={() => setFocusedInput(null)}
                       style={{
-                        width: '100%', padding: '0.85rem 1rem 0.85rem 2.8rem',
+                        width: '100%', padding: '0.75rem 1rem 0.75rem 2.8rem',
                         background: colors.inputBg,
                         border: `1.5px solid ${focusedInput === 'room-id' ? '#6366f1' : colors.inputBorder}`,
                         borderRadius: '12px', color: colors.textPrimary,
@@ -558,10 +558,10 @@ export default function HomeDashboard() {
                 <button
                   type="submit"
                   style={{
-                    width: '100%', padding: '0.95rem',
+                    width: '100%', padding: '0.85rem',
                     background: 'linear-gradient(135deg, #10b981, #059669)',
                     border: 'none', borderRadius: '12px',
-                    color: '#fff', fontWeight: 700, fontSize: '1rem',
+                    color: '#fff', fontWeight: 700, fontSize: '0.95rem',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
                     boxShadow: '0 8px 25px rgba(16, 185, 129, 0.35)',
                     transition: 'all 0.2s ease',
